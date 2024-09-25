@@ -5,13 +5,12 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 
-from model import (Actor, Critic)
-from memory import SequentialMemory
-from random_process import OrnsteinUhlenbeckProcess
-from util import *
+from DDPG.model import (Actor, Critic)
+from DDPG.memory import SequentialMemory
+from DDPG.random_process import OrnsteinUhlenbeckProcess
+from DDPG.util import *
 
 # from ipdb import set_trace as debug
-
 criterion = nn.MSELoss()
 
 class DDPG(object):
