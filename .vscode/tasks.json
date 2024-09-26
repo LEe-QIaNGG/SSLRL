@@ -1,0 +1,28 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run in Bash",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "python main.py"  // 这里替换成你的运行命令，比如 `python your_script.py` 或其他
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        }
+    ]
+}

@@ -1,0 +1,20 @@
+Failure # 1 (occurred at 2024-09-26_18-05-06)
+[36mray::ImplicitFunc.train()[39m (pid=4154179, ip=10.64.32.126, actor_id=67ffda0b56d8d491254b1dee01000000, repr=custom_dqn_train)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/tune/trainable/trainable.py", line 331, in train
+    raise skipped from exception_cause(skipped)
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/air/_internal/util.py", line 104, in run
+    self._ret = self._target(*self._args, **self._kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/tune/trainable/function_trainable.py", line 45, in <lambda>
+    training_func=lambda: self._trainable_func(self.config),
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/tune/trainable/function_trainable.py", line 250, in _trainable_func
+    output = fn()
+             ^^^^
+  File "/userhome/cs2/u3637311/pytorch-ddpg/main.py", line 46, in custom_dqn_train
+    checkpoint_dir = tune.get_trial_dir()  # 获取存储检查点的目录
+                     ^^^^^^^^^^^^^^^^^^
+AttributeError: module 'ray.tune' has no attribute 'get_trial_dir'

@@ -1,49 +1,73 @@
-# -*- coding: utf-8 -*-
-
 import ray
-from ray import air, tune
+import os
 from ray.rllib.algorithms.dqn import DQNConfig
+from ray.rllib.execution.rollout_ops import synchronous_parallel_sample
+from ray.rllib.execution.train_ops import train_one_step
+from ray import tune, air,train
+from ReplayBuffer import CustomReplayBuffer
 
-# ³õÊ¼»¯ Ray
+
+def custom_execution_plan(workers, dqn_algo):
+    # # 1. ä» workers ä¸­å¹¶è¡Œé‡‡æ ·æ•°æ®
+    train_batch = synchronous_parallel_sample(worker_set=dqn_algo.env_runner_group)
+    # 2. Updating the Policy.
+    train_results = train_one_step(dqn_algo, train_batch)
+    # 3. Synchronize worker weights.
+    dqn_algo.env_runner_group.sync_weights()
+    
+    
+    return train_results
+
+# è‡ªå®šä¹‰ DQN è®­ç»ƒè¿‡ç¨‹
+def custom_dqn_train(config):
+    custom_replay_buffer_config = {
+        "type": CustomReplayBuffer,
+        "capacity": 50000,  # è®¾ç½®ç»éªŒæ± çš„å®¹é‡
+    }
+    # åˆ›å»º DQN é…ç½®
+    dqn_config = DQNConfig().environment(config["env"]).framework(config["framework"]).training(
+        gamma=config["gamma"], lr=config["lr"], replay_buffer_config=custom_replay_buffer_config,
+    )
+
+    # æ„å»ºç®—æ³•å¯¹è±¡
+    dqn_algo = dqn_config.build()
+
+    # è·å– workers
+    workers = dqn_algo.workers
+    
+    # ä½¿ç”¨è‡ªå®šä¹‰çš„æ‰§è¡Œè®¡åˆ’è¿›è¡Œè®­ç»ƒ
+    for i in range(config["num_iterations"]):
+        # æ‰§è¡Œä¸€æ¬¡è‡ªå®šä¹‰è®­ç»ƒï¼ˆé‡‡æ ·+æ›´æ–°ï¼‰
+        results = custom_execution_plan(workers, dqn_algo).__iter__().__next__()
+
+         # å‘ Tune ä¸ŠæŠ¥ç»“æœ
+        train.report({'score':results})
+    # æ‰‹åŠ¨ä¿å­˜æœ€åçš„ checkpoint
+    checkpoint_dir = train.get_context().get_trial_dir()# è·å–å­˜å‚¨æ£€æŸ¥ç‚¹çš„ç›®å½•
+    checkpoint_path = os.path.join(checkpoint_dir, "final_checkpoint")
+    dqn_algo.save(checkpoint_path)
+    train.report({'score':results}, checkpoint=checkpoint_path)
+
+# åˆå§‹åŒ– Ray
 ray.init()
 
-# DQN Ëã·¨ÅäÖÃ
-config = (
-    DQNConfig()
-    .environment("CartPole-v1")  # ÉèÖÃ»·¾³
-    .framework("torch")          # Ê¹ÓÃ PyTorch ¿ò¼Ü£¬»òÕßÊ¹ÓÃ "tf" ¶ÔÓ¦ TensorFlow
-    .env_runners(num_env_runners=1,
-                 exploration_config={         
-            "epsilon_timesteps": 10000,  # epsilon ´Ó 1.0 Ë¥¼õµ½ 0.1 µÄ²½Êı
-            "final_epsilon": 0.1,        # epsilon ×îÖÕÖµ
-        })  # ²¢ĞĞ worker µÄÊıÁ¿
-    .training(
-        gamma=0.99,                  # ÕÛ¿ÛÒò×Ó
-        lr=1e-3,                     # Ñ§Ï°ÂÊ
-        train_batch_size=32,          # ÅúÁ¿´óĞ¡
-        replay_buffer_config={
-            "capacity": 50000         # »Ø·Å»º³åÇø´óĞ¡
-        },
-        target_network_update_freq=500,  # Ä¿±êÍøÂçµÄ¸üĞÂÆµÂÊ
-    )
-    .resources(num_gpus=0)            # Ê¹ÓÃ GPU µÄÊıÁ¿£¬0 ±íÊ¾Ö»Ê¹ÓÃ CPU
-)
 
-# ÔËĞĞÑµÁ·
 tuner = tune.Tuner(
-    "DQN",
-    param_space=config.to_dict(),      # ½«ÅäÖÃ×ªÎª×ÖµäĞÎÊ½´«µİ
-    run_config=air.RunConfig(stop={"episode_reward_mean": 200}, 
-                             checkpoint_config=air.CheckpointConfig(
-            checkpoint_at_end=True      # Ê¹ÓÃĞÂµÄ CheckpointConfig ¹ÜÀí¼ì²éµã
-        ))
+    custom_dqn_train,
+    param_space={
+        "env": "CartPole-v1",        # ç¯å¢ƒ
+        "framework": "torch",        # æ¡†æ¶
+        "num_workers": 1,            # å·¥ä½œçº¿ç¨‹
+        "num_iterations": 1000,        # è®­ç»ƒè¿­ä»£æ¬¡æ•°
+        "lr": tune.grid_search([1e-2, 1e-3]),  # Tune è¿›è¡Œå­¦ä¹ ç‡æœç´¢
+        "gamma": tune.choice([0.95, 0.99]),    # Tune è¿›è¡ŒæŠ˜æ‰£å› å­çš„æœç´¢
+    },
+    run_config=air.RunConfig(
+        stop={"training_iteration": 200},
+        checkpoint_config=air.CheckpointConfig(num_to_keep=3), 
+        storage_path="~/pytorch-ddpg/ray_results"
+    )
 )
 
+# è¿è¡Œè®­ç»ƒ
 results = tuner.fit()
-
-# »ñÈ¡²¢´òÓ¡×îÓÅÅäÖÃ
-best_result = results.get_best_result()
-print("Best config: ", best_result.config)
-
-# ¹Ø±Õ Ray
-ray.shutdown()
