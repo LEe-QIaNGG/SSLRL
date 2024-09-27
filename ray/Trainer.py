@@ -4,27 +4,28 @@ from ray import train
 import os
 from ray.rllib.execution.rollout_ops import synchronous_parallel_sample
 from ray.rllib.execution.train_ops import train_one_step
+from RewardEstimator import RewardEstimator
 
 def custom_dqn_train(config):
     custom_replay_buffer_config = {
         "type": CustomReplayBuffer,
-        "capacity": 50000,  # 设置经验池的容量
+        "capacity": 5000,  # 设置经验池的容量
     }
     # 创建 DQN 配置
     dqn_config = DQNConfig().environment(config["env"]).framework(config["framework"]).training(
-        gamma=config["gamma"], lr=config["lr"], replay_buffer_config=custom_replay_buffer_config,
+        gamma=config["gamma"], lr=config["lr"],
+        replay_buffer_config=custom_replay_buffer_config,
     )
 
     # 构建算法对象
     dqn_algo = dqn_config.build()
-
     # 获取 workers
     workers = dqn_algo.workers
     
     # 使用自定义的执行计划进行训练
     for i in range(config["num_iterations"]):
         # 执行一次自定义训练（采样+更新）
-        results = next(custom_execution_plan(workers, dqn_algo))
+        results = custom_execution_plan(workers, dqn_algo)
         
          # 向 Tune 上报结果
         train.report({'score':results})

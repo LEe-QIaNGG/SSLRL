@@ -1,0 +1,8 @@
+Failure # 1 (occurred at 2024-09-27_11-50-48)
+The actor died unexpectedly before finishing this task.
+	class_name: DQN
+	actor_id: 1be1bbcf80665ff3df72802401000000
+	pid: 39427
+	namespace: 7e8bfcf4-10e7-4b52-bd9d-abd2c6da6c75
+	ip: 10.64.32.126
+The actor is dead because its worker process has died. Worker exit type: SYSTEM_ERROR Worker exit detail: Worker unexpectedly exits with a connection error code 2. End of file. There are some potential root causes. (1) The process is killed by SIGKILL by OOM killer due to high memory usage. (2) ray stop --force is called. (3) The worker is crashed unexpectedly due to SIGSEGV or other unexpected errors.

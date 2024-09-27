@@ -1,0 +1,23 @@
+Failure # 1 (occurred at 2024-09-27_12-59-18)
+[36mray::ImplicitFunc.train()[39m (pid=69271, ip=10.64.32.126, actor_id=6142bcf091043fbc09b92df501000000, repr=custom_dqn_train)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/tune/trainable/trainable.py", line 331, in train
+    raise skipped from exception_cause(skipped)
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/air/_internal/util.py", line 104, in run
+    self._ret = self._target(*self._args, **self._kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/tune/trainable/function_trainable.py", line 45, in <lambda>
+    training_func=lambda: self._trainable_func(self.config),
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/tune/trainable/function_trainable.py", line 250, in _trainable_func
+    output = fn()
+             ^^^^
+  File "/userhome/cs2/u3637311/pytorch-ddpg/Trainer.py", line 27, in custom_dqn_train
+    results = next(custom_execution_plan(workers, dqn_algo))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/pytorch-ddpg/Trainer.py", line 39, in custom_execution_plan
+    dqn_algo.replay_buffer.estimateReward()
+    ^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'DQN' object has no attribute 'replay_buffer'

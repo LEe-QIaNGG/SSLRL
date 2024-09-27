@@ -1,0 +1,6 @@
+{
+  "env": "CartPole-v1",
+  "framework": "torch",
+  "num_iterations": 2,
+  "num_workers": 1
+}

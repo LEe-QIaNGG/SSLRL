@@ -1,0 +1,55 @@
+Failure # 1 (occurred at 2024-09-27_14-50-23)
+[36mray::ImplicitFunc.train()[39m (pid=91558, ip=10.64.32.126, actor_id=468df4c6c727093508ef604a01000000, repr=custom_dqn_train)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/tune/trainable/trainable.py", line 331, in train
+    raise skipped from exception_cause(skipped)
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/air/_internal/util.py", line 104, in run
+    self._ret = self._target(*self._args, **self._kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/tune/trainable/function_trainable.py", line 45, in <lambda>
+    training_func=lambda: self._trainable_func(self.config),
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/tune/trainable/function_trainable.py", line 250, in _trainable_func
+    output = fn()
+             ^^^^
+  File "/userhome/cs2/u3637311/pytorch-ddpg/Trainer.py", line 21, in custom_dqn_train
+    dqn_algo = dqn_config.build()
+               ^^^^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/rllib/algorithms/algorithm_config.py", line 889, in build
+    return algo_class(
+           ^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/rllib/algorithms/algorithm.py", line 571, in __init__
+    super().__init__(
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/tune/trainable/trainable.py", line 158, in __init__
+    self.setup(copy.deepcopy(self.config))
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/rllib/algorithms/algorithm.py", line 657, in setup
+    self.env_runner_group = EnvRunnerGroup(
+                            ^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/rllib/env/env_runner_group.py", line 189, in __init__
+    self._setup(
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/rllib/env/env_runner_group.py", line 280, in _setup
+    self._local_env_runner = self._make_worker(
+                             ^^^^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/rllib/env/env_runner_group.py", line 1173, in _make_worker
+    worker = cls(
+             ^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/rllib/evaluation/rollout_worker.py", line 397, in __init__
+    self.env = env_creator(copy.deepcopy(self.env_context))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/userhome/cs2/u3637311/anaconda3/envs/rl_env/lib/python3.12/site-packages/ray/rllib/env/utils/__init__.py", line 115, in _gym_env_creator
+    raise EnvError(ERR_MSG_INVALID_ENV_DESCRIPTOR.format(env_descriptor))
+ray.rllib.utils.error.EnvError: The env string you provided ('ALE/MontezumaRevenge-v5') is:
+a) Not a supported or -installed environment.
+b) Not a tune-registered environment creator.
+c) Not a valid env class string.
+
+Try one of the following:
+a) For Atari support: `pip install gym[atari] autorom[accept-rom-license]`.
+   For PyBullet support: `pip install pybullet`.
+b) To register your custom env, do `from ray import tune;
+   tune.register('[name]', lambda cfg: [return env obj from here using cfg])`.
+   Then in your config, do `config['env'] = [name]`.
+c) Make sure you provide a fully qualified classpath, e.g.:
+   `ray.rllib.examples.envs.classes.repeat_after_me_env.RepeatAfterMeEnv`
