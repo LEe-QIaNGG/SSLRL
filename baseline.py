@@ -16,13 +16,12 @@ from gymnasium.spaces import Box, Discrete, MultiBinary, MultiDiscrete
 import tianshou as ts
 from tianshou.data import Collector, CollectStats, VectorReplayBuffer
 from tianshou.highlevel.logger import LoggerFactoryDefault
-from Policy import DQNPolicy
+from tianshou.policy import DQNPolicy
 from tianshou.policy.base import BasePolicy
 from tianshou.policy.modelbased.icm import ICMPolicy
 from tianshou.trainer import OffpolicyTrainer
 from tianshou.utils.net.discrete import IntrinsicCuriosityModule
 from tianshou.utils.space_info import SpaceInfo
-from training_functions import Reward_Estimator
 
 
 def get_args() -> argparse.Namespace:
@@ -33,18 +32,18 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--eps-test", type=float, default=0.005)
     parser.add_argument("--eps-train", type=float, default=1.0)
     parser.add_argument("--eps-train-final", type=float, default=0.05)
-    parser.add_argument("--buffer-size", type=int, default=50000)  # �?100000减小�?50000
+    parser.add_argument("--buffer-size", type=int, default=50000)  
     parser.add_argument("--lr", type=float, default=0.0001)
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--n-step", type=int, default=3)
     parser.add_argument("--target-update-freq", type=int, default=500)
-    parser.add_argument("--epoch", type=int, default=5)
+    parser.add_argument("--epoch", type=int, default=50)
     parser.add_argument("--step-per-epoch", type=int, default=50000)
     parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
-    parser.add_argument("--batch-size", type=int, default=16)  # �?32减小�?16
-    parser.add_argument("--training-num", type=int, default=2)  # �?10减小�?4
-    parser.add_argument("--test-num", type=int, default=2)  # �?10减小�?4
+    parser.add_argument("--batch-size", type=int, default=16)  
+    parser.add_argument("--training-num", type=int, default=2)  
+    parser.add_argument("--test-num", type=int, default=2)  
     parser.add_argument("--logdir", type=str, default="log")
     parser.add_argument("--render", type=float, default=0.0)
     parser.add_argument(
@@ -104,7 +103,6 @@ def main(args: argparse.Namespace = get_args()) -> None:
     env = gym.make('MontezumaRevenge-ram-v4')
     train_envs = ts.env.DummyVectorEnv([lambda: gym.make('MontezumaRevenge-ram-v4') for _ in range(args.training_num)])
     test_envs = ts.env.DummyVectorEnv([lambda: gym.make('MontezumaRevenge-ram-v4') for _ in range(args.test_num)])
-    reward_estimator=Reward_Estimator()
 
     args.state_shape = env.observation_space.shape or env.observation_space.n
     args.action_shape = env.action_space.shape or env.action_space.n
@@ -129,9 +127,8 @@ def main(args: argparse.Namespace = get_args()) -> None:
         optim=optim,
         action_space=env.action_space,
         discount_factor=args.gamma,
-        estimation_step=args.n_step,#  n step  DQN
+        estimation_step=args.n_step,
         target_update_freq=args.target_update_freq,
-        reward_estimator=reward_estimator,
     )
 
     # load a previous policy
@@ -143,7 +140,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     buffer = VectorReplayBuffer(
         args.buffer_size,
         buffer_num=args.training_num,
-        #如下参数导致采样的记录不是obs shape形状�?
+        #濡備笅鍙傛暟瀵艰嚧閲囨牱鐨勮褰曚笉鏄痮bs shape褰㈢姸鐨�
         # ignore_obs_next=True,
         # save_only_last_obs=True,
         # stack_num=args.frames_stack,
@@ -193,6 +190,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
         if env_step % 1000 == 0:
             logger.write("train/env_step", env_step, {"train/eps": eps})
         
+
     def test_fn(epoch: int, env_step: int | None) -> None:
         policy.set_eps(args.eps_test)
 
@@ -259,3 +257,4 @@ def main(args: argparse.Namespace = get_args()) -> None:
 
 if __name__ == "__main__":
     main(get_args())
+    os.system("tmux kill-session -t 0")

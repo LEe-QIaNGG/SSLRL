@@ -18,7 +18,7 @@ from tianshou.data.types import (
 from tianshou.policy import BasePolicy
 from tianshou.policy.base import TLearningRateScheduler, TrainingStats
 from tianshou.utils.net.common import Net
-
+from training_functions import Reward_Estimator
 
 @dataclass(kw_only=True)
 class DQNTrainingStats(TrainingStats):
@@ -72,6 +72,7 @@ class DQNPolicy(BasePolicy[TDQNTrainingStats], Generic[TDQNTrainingStats]):
         clip_loss_grad: bool = False,
         observation_space: gym.Space | None = None,
         lr_scheduler: TLearningRateScheduler | None = None,
+        reward_estimator: Reward_Estimator,
     ) -> None:
         super().__init__(
             action_space=action_space,
@@ -103,7 +104,7 @@ class DQNPolicy(BasePolicy[TDQNTrainingStats], Generic[TDQNTrainingStats]):
 
         # TODO: set in forward, fix this!
         self.max_action_num: int | None = None
-
+        self.reward_estimator = reward_estimator
     def set_eps(self, eps: float) -> None:
         """Set the eps for epsilon-greedy exploration."""
         self.eps = eps
@@ -252,3 +253,17 @@ class DQNPolicy(BasePolicy[TDQNTrainingStats], Generic[TDQNTrainingStats]):
             rand_act = q.argmax(axis=1)
             act[rand_mask] = rand_act[rand_mask]
         return act
+    
+    def post_process_fn(
+        self,
+        batch: BatchProtocol,
+        buffer: ReplayBuffer,
+        indices: np.ndarray,
+    ) -> None:
+        """Post-process the data from the provided replay buffer.
+
+        Typical usage is to update the sampling weight in prioritized
+        experience replay. Used in :meth:`update`.
+        """
+
+        self.reward_estimator.update(batch, self._iter)

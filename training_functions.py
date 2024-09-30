@@ -1,54 +1,54 @@
 import torch
 
 class Net(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, num_reward):
         super(Net, self).__init__()
         self.fc1 = torch.nn.Linear(1, 10)
-        self.fc2 = torch.nn.Linear(10, 1)
+        self.fc2 = torch.nn.Linear(10, num_reward)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = self.fc2(x)
         return x
     
-class reward_estimator:
+class Reward_Estimator:
     def __init__(self):
+        '''è¦æ±‚ç¯å¢ƒçš„actionæ˜¯discrete
+        å¯ä»¥å°è¯•çš„å‡ ç§å¢å¼ºæ–¹å¼ï¼š
+        1. ä¿æŒé¡ºåºsmooth 
+
+        '''
         self.net = Net()
         self.optim = torch.optim.Adam(self.net.parameters(), lr=1e-3)
-    def update(self, buffer, epoch):
-        # ¸ù¾İepochÑ¡ÔñrewardÎª0»ò·Ç0µÄ¼ÇÂ¼
-        if epoch % 2 == 0:
-            # Å¼ÊıepochÑ¡Ôñ·ÇÁãreward¼ÇÂ¼
-            mask = buffer.rew != 0
-        else:
-            # ÆæÊıepochÑ¡ÔñÁãreward¼ÇÂ¼
-            mask = buffer.rew == 0
-        
+        self.reward_list=[-2,-1,0,1,2]
+        self.threshold=0.7
+
+    def get_input_data(self, buffer, mask):
         obs = buffer.obs[mask]
         action = buffer.act[mask]
         next_obs = buffer.obs_next[mask]
-        reward = buffer.rew[mask]
+        return torch.cat([obs, next_obs, action], dim=-1)
+    
+    def weak_augment(self, input_data):
+        pass
 
-        input_data = torch.cat([obs, action, next_obs], dim=-1)
-        predicted_reward = self.net(input_data)
+    def update_network(self, buffer):
+        '''æ›´æ–°rewardä¼°è®¡ç½‘ç»œï¼Œå†ä¿®æ”¹å¥–åŠ±'''
 
-        loss = torch.nn.MSELoss()(predicted_reward, reward)
+        # åˆ†åˆ«è®¡ç®—éé›¶å¥–åŠ±å’Œé›¶å¥–åŠ±çš„æŸå¤±
+        mask_nonzero = buffer.rew != 0
+        mask_zero = buffer.rew == 0
+
+        # # è®¡ç®—çœŸå®å¥–åŠ±çš„æŸå¤±
+        input_data_nonzero = self.get_input_data(buffer, mask_nonzero)
+        confidence_scores = self.net(input_data_nonzero)
+        max_confidence, max_indices = torch.max(confidence_scores, dim=1)
+        predicted_reward = torch.tensor([self.reward_list[i] if conf > self.threshold else 0 for i, conf in zip(max_indices, max_confidence)])
+        loss_nonzero = torch.nn.MSELoss()(predicted_reward, buffer.rew[mask_nonzero])
         
-        self.optim.zero_grad()
-        loss.backward()
-        self.optim.step()
+        input_data_zero = self.get_input_data(buffer, mask_zero)
+
         
     def estimate(self,buffer):
         pass
 
-def train_fn(epoch: int, env_step: int, args,logger,policy) -> None:
-    # nature DQN setting, linear decay in the first 1M steps
-    if env_step <= 1e6:
-        eps = args.eps_train - env_step / 1e6 * (args.eps_train - args.eps_train_final)
-    else:
-        eps = args.eps_train_final
-    policy.set_eps(eps)
-    if env_step % 1000 == 0:
-        logger.write("train/env_step", env_step, {"train/eps": eps})
-    #µÚÒ»¸öepoch³õÊ¼»¯reward estimator£¬update estimatorÍøÂç£¬¸üĞÂbufferµÄrewardÖµ
-    print(train_collector.buffer)
