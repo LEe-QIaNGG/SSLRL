@@ -399,7 +399,8 @@ class AtariEnvFactory(EnvFactoryRegistered):
         use_envpool_if_available: bool = True,
         venv_type: VectorEnvType = VectorEnvType.SUBPROC_SHARED_MEM_AUTO,
     ) -> None:
-        assert "NoFrameskip" in task
+        if "NoFrameskip" not in task:
+            print(f"警告: 任务 '{task}' 不包含 'NoFrameskip'。这可能会影响环境的行为。")
         self.frame_stack = frame_stack
         self.scale = scale
         envpool_factory = None

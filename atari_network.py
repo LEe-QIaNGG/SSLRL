@@ -75,7 +75,7 @@ class DQN(NetBase[Any]):
         super().__init__()
         self.device = device
         self.net = nn.Sequential(
-            layer_init(nn.Conv2d(c, 32, kernel_size=8, stride=4)),
+            layer_init(nn.Conv2d(c, 32, kernel_size=8, stride=1)),
             nn.ReLU(inplace=True),
             layer_init(nn.Conv2d(32, 64, kernel_size=4, stride=2)),
             nn.ReLU(inplace=True),
