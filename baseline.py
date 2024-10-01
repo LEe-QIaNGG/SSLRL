@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import argparse
 import datetime
 import os
@@ -26,7 +27,7 @@ from tianshou.utils.space_info import SpaceInfo
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", type=str, default="MontezumaRevenge-ram-v4")
+    parser.add_argument("--task", type=str, default="CartPole-v0")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--scale-obs", type=int, default=0)
     parser.add_argument("--eps-test", type=float, default=0.005)
@@ -37,8 +38,8 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--n-step", type=int, default=3)
     parser.add_argument("--target-update-freq", type=int, default=500)
-    parser.add_argument("--epoch", type=int, default=50)
-    parser.add_argument("--step-per-epoch", type=int, default=50000)
+    parser.add_argument("--epoch", type=int, default=3)
+    parser.add_argument("--step-per-epoch", type=int, default=10000)
     parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
     parser.add_argument("--batch-size", type=int, default=16)  
@@ -100,9 +101,9 @@ def main(args: argparse.Namespace = get_args()) -> None:
     #     frame_stack=args.frames_stack,
     # )
 
-    env = gym.make('MontezumaRevenge-ram-v4')
-    train_envs = ts.env.DummyVectorEnv([lambda: gym.make('MontezumaRevenge-ram-v4') for _ in range(args.training_num)])
-    test_envs = ts.env.DummyVectorEnv([lambda: gym.make('MontezumaRevenge-ram-v4') for _ in range(args.test_num)])
+    env = gym.make('CartPole-v1')
+    train_envs = ts.env.DummyVectorEnv([lambda: gym.make('CartPole-v1') for _ in range(args.training_num)])
+    test_envs = ts.env.DummyVectorEnv([lambda: gym.make('CartPole-v1') for _ in range(args.test_num)])
 
     args.state_shape = env.observation_space.shape or env.observation_space.n
     args.action_shape = env.action_space.shape or env.action_space.n
@@ -140,7 +141,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     buffer = VectorReplayBuffer(
         args.buffer_size,
         buffer_num=args.training_num,
-        #濡備笅鍙傛暟瀵艰嚧閲囨牱鐨勮褰曚笉鏄痮bs shape褰㈢姸鐨�
+        #婵″倷绗呴崣鍌涙殶鐎佃壈鍤ч柌鍥ㄧ壉閻ㄥ嫯顔囪ぐ鏇氱瑝閺勭棶bs shape瑜般垻濮搁惃锟�
         # ignore_obs_next=True,
         # save_only_last_obs=True,
         # stack_num=args.frames_stack,
