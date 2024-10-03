@@ -33,18 +33,18 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--eps-test", type=float, default=0.005)
     parser.add_argument("--eps-train", type=float, default=1.0)
     parser.add_argument("--eps-train-final", type=float, default=0.05)
-    parser.add_argument("--buffer-size", type=int, default=50000)  # �?100000减小�?50000
+    parser.add_argument("--buffer-size", type=int, default=50000)  
     parser.add_argument("--lr", type=float, default=0.0001)
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--n-step", type=int, default=3)
     parser.add_argument("--target-update-freq", type=int, default=500)
-    parser.add_argument("--epoch", type=int, default=5)
-    parser.add_argument("--step-per-epoch", type=int, default=50000)
+    parser.add_argument("--epoch", type=int, default=500)
+    parser.add_argument("--step-per-epoch", type=int, default=5000)
     parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
-    parser.add_argument("--batch-size", type=int, default=16)  # �?32减小�?16
-    parser.add_argument("--training-num", type=int, default=2)  # �?10减小�?4
-    parser.add_argument("--test-num", type=int, default=2)  # �?10减小�?4
+    parser.add_argument("--batch-size", type=int, default=16)  
+    parser.add_argument("--training-num", type=int, default=2)  
+    parser.add_argument("--test-num", type=int, default=2) 
     parser.add_argument("--logdir", type=str, default="log")
     parser.add_argument("--render", type=float, default=0.0)
     parser.add_argument(
@@ -143,8 +143,8 @@ def main(args: argparse.Namespace = get_args()) -> None:
     buffer = VectorReplayBuffer(
         args.buffer_size,
         buffer_num=args.training_num,
-        #如下参数导致采样的记录不是obs shape形状�?
-        # ignore_obs_next=True,
+        #如下参数导致采样的记录不是obs shape形状�??
+        ignore_obs_next=True,
         # save_only_last_obs=True,
         # stack_num=args.frames_stack,
     )

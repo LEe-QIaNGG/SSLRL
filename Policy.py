@@ -266,5 +266,5 @@ class DQNPolicy(BasePolicy[TDQNTrainingStats], Generic[TDQNTrainingStats]):
         experience replay. Used in :meth:`update`.
         """
 
-        alpha = 1 - np.exp(-self._iter / 50000)  # Áãreward lossµÄ±ÈÀý
-        self.reward_estimator.update(batch, alpha)
+        alpha = 1 - np.exp(-self._iter / 50000)  
+        self.reward_estimator.update(batch,buffer, alpha,self._iter)

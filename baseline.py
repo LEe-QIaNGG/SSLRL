@@ -33,18 +33,18 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--eps-test", type=float, default=0.005)
     parser.add_argument("--eps-train", type=float, default=1.0)
     parser.add_argument("--eps-train-final", type=float, default=0.05)
-    parser.add_argument("--buffer-size", type=int, default=50000)  
+    parser.add_argument("--buffer-size", type=int, default=5000)  
     parser.add_argument("--lr", type=float, default=0.0001)
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--n-step", type=int, default=3)
     parser.add_argument("--target-update-freq", type=int, default=500)
-    parser.add_argument("--epoch", type=int, default=3)
-    parser.add_argument("--step-per-epoch", type=int, default=10000)
+    parser.add_argument("--epoch", type=int, default=500)
+    parser.add_argument("--step-per-epoch", type=int, default=2000)
     parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
-    parser.add_argument("--batch-size", type=int, default=16)  
+    parser.add_argument("--batch-size", type=int, default=8)  
     parser.add_argument("--training-num", type=int, default=2)  
-    parser.add_argument("--test-num", type=int, default=2)  
+    parser.add_argument("--test-num", type=int, default=1)  
     parser.add_argument("--logdir", type=str, default="log")
     parser.add_argument("--render", type=float, default=0.0)
     parser.add_argument(
@@ -101,9 +101,9 @@ def main(args: argparse.Namespace = get_args()) -> None:
     #     frame_stack=args.frames_stack,
     # )
 
-    env = gym.make('CartPole-v1')
-    train_envs = ts.env.DummyVectorEnv([lambda: gym.make('CartPole-v1') for _ in range(args.training_num)])
-    test_envs = ts.env.DummyVectorEnv([lambda: gym.make('CartPole-v1') for _ in range(args.test_num)])
+    env = gym.make('MontezumaRevenge-ramDeterministic-v4')
+    train_envs = ts.env.DummyVectorEnv([lambda: gym.make('MontezumaRevenge-ramDeterministic-v4') for _ in range(args.training_num)])
+    test_envs = ts.env.DummyVectorEnv([lambda: gym.make('MontezumaRevenge-ramDeterministic-v4') for _ in range(args.test_num)])
 
     args.state_shape = env.observation_space.shape or env.observation_space.n
     args.action_shape = env.action_space.shape or env.action_space.n
@@ -142,7 +142,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
         args.buffer_size,
         buffer_num=args.training_num,
         #婵″倷绗呴崣鍌涙殶鐎佃壈鍤ч柌鍥ㄧ壉閻ㄥ嫯顔囪ぐ鏇氱瑝閺勭棶bs shape瑜般垻濮搁惃锟�
-        # ignore_obs_next=True,
+        ignore_obs_next=True,
         # save_only_last_obs=True,
         # stack_num=args.frames_stack,
     )

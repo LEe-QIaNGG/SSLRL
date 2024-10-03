@@ -87,11 +87,55 @@ class Reward_Estimator:
         self.optim.step()
 
     def update_reward(self, buffer):
-        pass
+        # 获取buffer中的obs、obs_next和act
+        obs = torch.tensor(buffer.obs)
+        obs_next = torch.tensor(buffer.obs_next)
+        act = torch.tensor(buffer.act).unsqueeze(-1)
+        
+        # 拼接输入数据
+        input_data = torch.cat([obs, obs_next, act], dim=-1)
+        
+        # 获取当前奖励
+        current_rewards = torch.tensor(buffer.rew)
+        
+        # 对于reward_list中的每个值，找到buffer中对应的项
+        for reward_value in self.reward_list:
+            mask = current_rewards == reward_value
+            if torch.any(mask):
+                # 获取满足条件的输入数据
+                masked_input = input_data[mask]
+                
+                # 通过网络获取置信度
+                confidence_scores = self.net(masked_input)
+                
+                # 获取最大置信度及其索引
+                max_confidence, max_indices = torch.max(confidence_scores, dim=1)
+                
+                # 更新满足条件的奖励
+                update_mask = max_confidence > self.threshold
+                if torch.any(update_mask):
+                    new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
+                    buffer.rew[mask][update_mask] = new_rewards.numpy()
+        
 
-    def update(self, buffer, alpha):
+    def update(self, batch, buffer, alpha, iter):
         '''更新reward估计网络，再修改奖励'''
-        self.update_network(buffer, alpha)
+        update_flag = False
+        if iter == 1:
+            buffer_rew = torch.tensor(buffer.rew)
+            if not torch.all(buffer_rew == 0):
+                self.update_network(buffer, alpha)
+                update_flag = True
+        else:
+            batch_rew = torch.tensor(batch.rew)
+            if not torch.all(batch_rew == 0):
+                self.update_network(batch, alpha)
+                update_flag = True
+        
+        if update_flag:
+            self.update_reward(buffer)
+        else:
+            print("奖励全为0，不更新")
 
         
         
