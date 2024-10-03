@@ -120,7 +120,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     state_shape = space_info.observation_info.obs_shape
     action_shape = space_info.action_info.action_shape
     net = Net(state_shape=state_shape, action_shape=action_shape, hidden_sizes=[128, 128, 128]).to(args.device)
-    optim = torch.optim.Adam(net.parameters(), lr=args.lr)
+    optim = torch.optim.Adam(net.parameters(), lr=args.lr).to(args.device)
 
     # define policy
     policy= DQNPolicy(
