@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import torch
+import numpy as np
 
 class Net(torch.nn.Module):
     def __init__(self, num_reward=5):
@@ -15,20 +16,21 @@ class Net(torch.nn.Module):
 class Reward_Estimator:
     def __init__(self):
         '''要求环境的action是discrete
-        可以尝试的几种增强方式：
-        1. 保持顺序smooth 
+        
 
         '''
         self.net = Net()
         self.optim = torch.optim.Adam(self.net.parameters(), lr=1e-3)
         self.reward_list=[-2,-1,0,1,2]
+        self.true_reward=[]
         self.threshold=0.7
 
-    def get_input_data(self, buffer, mask):
-        obs = buffer.obs[mask]
-        action = buffer.act[mask]
-        next_obs = buffer.obs_next[mask]
-        return torch.cat([obs, next_obs, action], dim=-1)
+    def get_input_data(self, buffer, mask_nonzero):
+        obs = torch.tensor(buffer.obs[mask_nonzero])
+        action = torch.tensor(buffer.act[mask_nonzero])
+        next_obs = torch.tensor(buffer.obs_next[mask_nonzero])
+        action = action.unsqueeze(1)  # 添加这一行
+        return torch.cat([obs, next_obs, action], dim=-1).float()
     
     def weak_augment(self, input_data):
         # 分离action列
@@ -56,6 +58,11 @@ class Reward_Estimator:
         
         # 重新组合数据
         return torch.cat([smoothed_data, action], dim=-1)
+    
+    def calculate_mask(self, buffer):
+        # 使用numpy的isin函数来创建掩码
+        # ~操作符用于取反，因为我们要找的是不在true_reward中的项
+        return ~np.isin(buffer.rew, self.true_reward)
 
     def update_network(self, buffer, alpha):
         # 分别计算非零奖励和零奖励的损失
