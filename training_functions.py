@@ -2,7 +2,7 @@
 import torch
 
 class Net(torch.nn.Module):
-    def __init__(self, num_reward):
+    def __init__(self, num_reward=5):
         super(Net, self).__init__()
         self.fc1 = torch.nn.Linear(1, 10)
         self.fc2 = torch.nn.Linear(10, num_reward)
@@ -134,8 +134,9 @@ class Reward_Estimator:
         
         if update_flag:
             self.update_reward(buffer)
-        else:
-            print("奖励全为0，不更新")
+            print("奖励不为零")
+        # else:
+        #     print("奖励全为0，不更新")
 
         
         
