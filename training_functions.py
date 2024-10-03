@@ -3,9 +3,9 @@ import torch
 import numpy as np
 
 class Net(torch.nn.Module):
-    def __init__(self, num_reward=5):
+    def __init__(self, obs_dim, act_dim, num_reward=5):
         super(Net, self).__init__()
-        self.fc1 = torch.nn.Linear(1, 10)
+        self.fc1 = torch.nn.Linear(obs_dim*2+act_dim, 10)
         self.fc2 = torch.nn.Linear(10, num_reward)
 
     def forward(self, x):
@@ -14,13 +14,13 @@ class Net(torch.nn.Module):
         return x
     
 class Reward_Estimator:
-    def __init__(self):
+    def __init__(self, obs_dim, act_dim,device):
         '''要求环境的action是discrete
         
 
         '''
-        self.net = Net()
-        self.optim = torch.optim.Adam(self.net.parameters(), lr=1e-3)
+        self.net = Net(obs_dim, act_dim).to(device)
+        self.optim = torch.optim.Adam(self.net.parameters(), lr=1e-3).to(device)
         self.reward_list=[-2,-1,0,1,2]
         self.true_reward=[]
         self.threshold=0.7
@@ -74,7 +74,7 @@ class Reward_Estimator:
         confidence_scores = self.net(input_data_nonzero)
         max_confidence, max_indices = torch.max(confidence_scores, dim=1)
         predicted_reward = torch.tensor([self.reward_list[i] if conf > self.threshold else 0 for i, conf in zip(max_indices, max_confidence)])
-        loss_nonzero = torch.nn.MSELoss()(predicted_reward, buffer.rew[mask_nonzero])
+        loss_nonzero = torch.nn.MSELoss()(predicted_reward, torch.tensor(buffer.rew[mask_nonzero]))
         
         input_data_zero = self.get_input_data(buffer, mask_zero)
         input_data_zero_weak = self.weak_augment(input_data_zero)

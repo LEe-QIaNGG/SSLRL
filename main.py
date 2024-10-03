@@ -14,7 +14,8 @@ from tianshou.utils.net.common import Net
 from gymnasium.spaces import Box, Discrete, MultiBinary, MultiDiscrete
 
 import tianshou as ts
-from tianshou.data import Collector, CollectStats, VectorReplayBuffer
+from tianshou.data import Collector, CollectStats    , VectorReplayBuffer
+# from Buffer import VectorReplayBuffer
 from tianshou.highlevel.logger import LoggerFactoryDefault
 from Policy import DQNPolicy
 from tianshou.policy.base import BasePolicy
@@ -101,10 +102,9 @@ def main(args: argparse.Namespace = get_args()) -> None:
     #     frame_stack=args.frames_stack,
     # )
 
-    env = gym.make('MontezumaRevenge-ram-v4')
-    train_envs = ts.env.DummyVectorEnv([lambda: gym.make('MontezumaRevenge-ram-v4') for _ in range(args.training_num)])
-    test_envs = ts.env.DummyVectorEnv([lambda: gym.make('MontezumaRevenge-ram-v4') for _ in range(args.test_num)])
-    reward_estimator=Reward_Estimator()
+    env = gym.make('Seaquest-ram-v4')
+    train_envs = ts.env.DummyVectorEnv([lambda: gym.make('Seaquest-ram-v4') for _ in range(args.training_num)])
+    test_envs = ts.env.DummyVectorEnv([lambda: gym.make('Seaquest-ram-v4') for _ in range(args.test_num)])
 
     args.state_shape = env.observation_space.shape or env.observation_space.n
     args.action_shape = env.action_space.shape or env.action_space.n
@@ -122,7 +122,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     action_shape = space_info.action_info.action_shape
     net = Net(state_shape=state_shape, action_shape=action_shape, hidden_sizes=[128, 128, 128]).to(args.device)
     optim = torch.optim.Adam(net.parameters(), lr=args.lr)
-
+    reward_estimator=Reward_Estimator(args.state_shape[0], act_dim=1,devive=args.device)
     # define policy
     policy= DQNPolicy(
         model=net,
@@ -144,7 +144,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
         args.buffer_size,
         buffer_num=args.training_num,
         #如下参数导致采样的记录不是obs shape形状�??
-        ignore_obs_next=True,
+        # ignore_obs_next=True,
         # save_only_last_obs=True,
         # stack_num=args.frames_stack,
     )
