@@ -119,8 +119,8 @@ def main(args: argparse.Namespace = get_args()) -> None:
     space_info = SpaceInfo.from_env(env)
     state_shape = space_info.observation_info.obs_shape
     action_shape = space_info.action_info.action_shape
-    net = Net(state_shape=state_shape, action_shape=action_shape, hidden_sizes=[128, 128, 128]).to(args.device)
-    optim = torch.optim.Adam(net.parameters(), lr=args.lr).to(args.device)
+    net = Net(state_shape=state_shape, action_shape=action_shape, hidden_sizes=[128, 128, 128],device=args.device)
+    optim = torch.optim.Adam(net.parameters(), lr=args.lr)
 
     # define policy
     policy= DQNPolicy(
@@ -130,7 +130,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
         discount_factor=args.gamma,
         estimation_step=args.n_step,
         target_update_freq=args.target_update_freq,
-    )
+    ).to(args.device)
 
     # load a previous policy
     if args.resume_path:

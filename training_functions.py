@@ -20,15 +20,16 @@ class Reward_Estimator:
 
         '''
         self.net = Net(obs_dim, act_dim).to(device)
-        self.optim = torch.optim.Adam(self.net.parameters(), lr=1e-3).to(device)
+        self.optim = torch.optim.Adam(self.net.parameters(), lr=1e-3)
         self.reward_list=[-2,-1,0,1,2]
         self.true_reward=[]
         self.threshold=0.7
+        self.device=device
 
     def get_input_data(self, buffer, mask_nonzero):
-        obs = torch.tensor(buffer.obs[mask_nonzero])
-        action = torch.tensor(buffer.act[mask_nonzero])
-        next_obs = torch.tensor(buffer.obs_next[mask_nonzero])
+        obs = torch.tensor(buffer.obs[mask_nonzero], device=self.device)
+        action = torch.tensor(buffer.act[mask_nonzero], device=self.device)
+        next_obs = torch.tensor(buffer.obs_next[mask_nonzero], device=self.device)
         action = action.unsqueeze(1)  # 添加这一行
         return torch.cat([obs, next_obs, action], dim=-1).float()
     
@@ -100,7 +101,7 @@ class Reward_Estimator:
         act = torch.tensor(buffer.act).unsqueeze(-1)
         
         # 拼接输入数据
-        input_data = torch.cat([obs, obs_next, act], dim=-1)
+        input_data = torch.cat([obs, obs_next, act], dim=-1).float().to(self.device)
         
         # 获取当前奖励
         current_rewards = torch.tensor(buffer.rew)
@@ -122,7 +123,7 @@ class Reward_Estimator:
                 update_mask = max_confidence > self.threshold
                 if torch.any(update_mask):
                     new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
-                    buffer.rew[mask][update_mask] = new_rewards.numpy()
+                    buffer.rew[mask][update_mask] = new_rewards.cpu().numpy()
         
 
     def update(self, batch, buffer, alpha, iter):
