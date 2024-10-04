@@ -117,13 +117,13 @@ class Reward_Estimator:
                 confidence_scores = self.net(masked_input)
                 
                 # 获取最大置信度及其索引
-                max_confidence, max_indices = torch.max(confidence_scores, dim=1)
+                max_confidence, max_indices = torch.max(confidence_scores.cpu(), dim=1)
                 
                 # 更新满足条件的奖励
                 update_mask = max_confidence > self.threshold
                 if torch.any(update_mask):
                     new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
-                    buffer.rew[mask][update_mask] = new_rewards.cpu().numpy()
+                    buffer.rew[mask][update_mask] = new_rewards.numpy()
         
 
     def update(self, batch, buffer, alpha, iter):
