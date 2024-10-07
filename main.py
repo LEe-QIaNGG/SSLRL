@@ -28,7 +28,7 @@ from training_functions import Reward_Estimator
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", type=str, default="MontezumaRevenge-ram-v4")
+    parser.add_argument("--task", type=str, default="Seaquest-ram-v4")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--scale-obs", type=int, default=0)
     parser.add_argument("--eps-test", type=float, default=0.005)
@@ -41,7 +41,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--target-update-freq", type=int, default=500)
     parser.add_argument("--epoch", type=int, default=500)
     parser.add_argument("--step-per-epoch", type=int, default=5000)
-    parser.add_argument("--step-per-collect", type=int, default=10)
+    parser.add_argument("--step-per-collect", type=int, default=8)
     parser.add_argument("--update-per-step", type=float, default=0.1)
     parser.add_argument("--batch-size", type=int, default=128)  
     parser.add_argument("--training-num", type=int, default=8)  
@@ -102,9 +102,9 @@ def main(args: argparse.Namespace = get_args()) -> None:
     #     frame_stack=args.frames_stack,
     # )
 
-    env = gym.make('Seaquest-ram-v4')
-    train_envs = ts.env.DummyVectorEnv([lambda: gym.make('Seaquest-ram-v4') for _ in range(args.training_num)])
-    test_envs = ts.env.DummyVectorEnv([lambda: gym.make('Seaquest-ram-v4') for _ in range(args.test_num)])
+    env = gym.make(args.task)
+    train_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.training_num)])
+    test_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.test_num)])
 
     args.state_shape = env.observation_space.shape or env.observation_space.n
     args.action_shape = env.action_space.shape or env.action_space.n
