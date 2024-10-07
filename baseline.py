@@ -7,10 +7,10 @@ import sys
 import gymnasium as gym 
 
 import numpy as np
-import envpool
+# import envpool
 import torch
-from atari_network import DQN
-from atari_wrapper import make_atari_env
+# from atari_network import DQN
+# from atari_wrapper import make_atari_env
 from tianshou.utils.net.common import Net
 from gymnasium.spaces import Box, Discrete, MultiBinary, MultiDiscrete
 
@@ -27,24 +27,24 @@ from tianshou.utils.space_info import SpaceInfo
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", type=str, default="CartPole-v0")
+    parser.add_argument("--task", type=str, default="Seaquest-ram-v4")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--scale-obs", type=int, default=0)
     parser.add_argument("--eps-test", type=float, default=0.005)
     parser.add_argument("--eps-train", type=float, default=1.0)
     parser.add_argument("--eps-train-final", type=float, default=0.05)
-    parser.add_argument("--buffer-size", type=int, default=5000)  
+    parser.add_argument("--buffer-size", type=int, default=50000)  
     parser.add_argument("--lr", type=float, default=0.0001)
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--n-step", type=int, default=3)
     parser.add_argument("--target-update-freq", type=int, default=500)
-    parser.add_argument("--epoch", type=int, default=500)
-    parser.add_argument("--step-per-epoch", type=int, default=2000)
-    parser.add_argument("--step-per-collect", type=int, default=10)
+    parser.add_argument("--epoch", type=int, default=2000)
+    parser.add_argument("--step-per-epoch", type=int, default=3000)
+    parser.add_argument("--step-per-collect", type=int, default=8)
     parser.add_argument("--update-per-step", type=float, default=0.1)
-    parser.add_argument("--batch-size", type=int, default=8)  
-    parser.add_argument("--training-num", type=int, default=2)  
-    parser.add_argument("--test-num", type=int, default=1)  
+    parser.add_argument("--batch-size", type=int, default=128)  
+    parser.add_argument("--training-num", type=int, default=8)  
+    parser.add_argument("--test-num", type=int, default=2)  
     parser.add_argument("--logdir", type=str, default="log")
     parser.add_argument("--render", type=float, default=0.0)
     parser.add_argument(
@@ -101,9 +101,9 @@ def main(args: argparse.Namespace = get_args()) -> None:
     #     frame_stack=args.frames_stack,
     # )
 
-    env = gym.make('MontezumaRevenge-ramDeterministic-v4')
-    train_envs = ts.env.DummyVectorEnv([lambda: gym.make('MontezumaRevenge-ramDeterministic-v4') for _ in range(args.training_num)])
-    test_envs = ts.env.DummyVectorEnv([lambda: gym.make('MontezumaRevenge-ramDeterministic-v4') for _ in range(args.test_num)])
+    env = gym.make(args.task)
+    train_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.training_num)])
+    test_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.test_num)])
 
     args.state_shape = env.observation_space.shape or env.observation_space.n
     args.action_shape = env.action_space.shape or env.action_space.n
@@ -153,7 +153,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     # log
     now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
     args.algo_name = "dqn_icm" if args.icm_lr_scale > 0 else "dqn"
-    log_name = os.path.join(args.task, args.algo_name, str(args.seed), now)
+    log_name = os.path.join(args.task, args.algo_name, 'baseline', now)
     log_path = os.path.join(args.logdir, log_name)
 
     # logger
