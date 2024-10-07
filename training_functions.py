@@ -1,17 +1,7 @@
 # -*- coding: utf-8 -*-
 import torch
 import numpy as np
-
-class Net(torch.nn.Module):
-    def __init__(self, obs_dim, act_dim, num_reward=5):
-        super(Net, self).__init__()
-        self.fc1 = torch.nn.Linear(obs_dim*2+act_dim, 10)
-        self.fc2 = torch.nn.Linear(10, num_reward)
-
-    def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
+from network import ResNet
     
 class Reward_Estimator:
     def __init__(self, obs_dim, act_dim,device):
@@ -19,7 +9,10 @@ class Reward_Estimator:
         
 
         '''
-        self.net = Net(obs_dim, act_dim).to(device)
+        self.obs_dim = obs_dim
+        self.num_reward = 5
+        self.Qnet = ResNet(obs_dim+act_dim, self.num_reward).to(device)
+        self.Vnet = ResNet(obs_dim, self.num_reward ).to(device)
         self.optim = torch.optim.Adam(self.net.parameters(), lr=1e-3)
         self.reward_list=[-2,-1,0,1,2]
         self.true_reward=[]
@@ -72,29 +65,28 @@ class Reward_Estimator:
 
         # # 计算真实奖励的损失
         input_data_nonzero = self.get_input_data(buffer, mask_nonzero)
-        confidence_scores = self.net(input_data_nonzero)
+        confidence_scores, loss2 = self.get_QVconfidence(input_data_nonzero, is_L2=True)
         max_confidence, max_indices = torch.max(confidence_scores, dim=1)
         predicted_reward = torch.tensor([self.reward_list[i] if conf > self.threshold else 0 for i, conf in zip(max_indices, max_confidence)])
         loss_nonzero = torch.nn.MSELoss()(predicted_reward, torch.tensor(buffer.rew[mask_nonzero]))
         
+        #constancy regularization
         input_data_zero = self.get_input_data(buffer, mask_zero)
         input_data_zero_weak = self.weak_augment(input_data_zero)
         input_data_zero_strong = self.strong_augment(input_data_zero)
-        combined_input = torch.cat([input_data_zero_weak, input_data_zero_strong], dim=0)
-        combined_confidence_scores = self.net(combined_input)
-        batch_size = input_data_zero_weak.shape[0]
-        confidence_scores_weak = combined_confidence_scores[:batch_size]
-        confidence_scores_strong = combined_confidence_scores[batch_size:]
+
+        confidence_scores_weak,loss_constancy_weak = self.get_QVconfidence(input_data_zero_weak, is_L2=True)
+        confidence_scores_strong,loss_constancy_strong = self.get_QVconfidence(input_data_zero_strong, is_L2=True)
         
         # 计算交叉熵损失
         loss_zero = torch.nn.CrossEntropyLoss()(confidence_scores_strong, confidence_scores_weak.argmax(dim=1))
-        #L2有待实现
-        Loss_total = loss_nonzero + alpha * loss_zero
+
+        Loss_total = (1-alpha)*loss_nonzero  + alpha * loss_zero+loss2+loss_constancy_weak+loss_constancy_strong
         self.optim.zero_grad()
         Loss_total.backward()
         self.optim.step()
 
-    def update_reward(self, buffer):
+    def update_reward(self, buffer, alpha):
         # 获取buffer中的obs、obs_next和act
         obs = torch.tensor(buffer.obs)
         obs_next = torch.tensor(buffer.obs_next)
@@ -114,7 +106,7 @@ class Reward_Estimator:
                 masked_input = input_data[mask]
                 
                 # 通过网络获取置信度
-                confidence_scores = self.net(masked_input)
+                confidence_scores = self.get_QVconfidence(masked_input)
                 
                 # 获取最大置信度及其索引
                 max_confidence, max_indices = torch.max(confidence_scores.cpu(), dim=1)
@@ -141,13 +133,56 @@ class Reward_Estimator:
                 update_flag = True
         
         if update_flag:
-            self.update_reward(buffer)
+            self.update_reward(buffer,alpha)
             print("奖励不为零")
         # else:
         #     print("奖励全为0，不更新")
 
         
         
-    def estimate(self,buffer):
-        pass
+    def get_QVconfidence(self, input_data, is_L2):
+        # 分离输入数据
+        obs = input_data[:, :self.obs_dim]
+        obs_next = input_data[:, self.obs_dim:2*self.obs_dim]
+        action = input_data[:, -self.act_dim:]
+        
+        # 拼接obs和action作为Qnet的输入
+        q_input = torch.cat([obs, action], dim=-1)
+        Q_confidence = self.Qnet(q_input)
+        
+        # 使用obs_next作为Vnet的输入
+        V_confidence_next = self.Vnet(obs_next)
+        total_confidence = (Q_confidence + V_confidence_next)/2
+
+        #计算L2
+        if is_L2:
+            V_confidence=self.Vnet(obs)
+            L2=self.calculate_L2(V_confidence, Q_confidence)
+            return total_confidence, L2
+        return total_confidence
+
+    def calculate_L2(self, V_confidence, Q_confidence):
+        # 获取V和Q的最大置信度值及其索引
+        V_max_confidence, V_max_indices = torch.max(V_confidence, dim=1)
+        Q_max_confidence, Q_max_indices = torch.max(Q_confidence, dim=1)
+        
+        # 创建掩码，找出大于阈值的项
+        V_mask = V_max_confidence > self.threshold
+        Q_mask = Q_max_confidence > self.threshold
+        
+        # 取V_mask和Q_mask的交集
+        combined_mask = V_mask & Q_mask
+        
+        # 获取满足条件的奖励值
+        V_rewards = torch.tensor([self.reward_list[i] for i in V_max_indices[combined_mask]])
+        Q_rewards = torch.tensor([self.reward_list[i] for i in Q_max_indices[combined_mask]])
+        
+        # 只在Q比V大时计算MSE损失
+        mask = Q_rewards > V_rewards
+        if mask.any():
+            L2 = torch.nn.MSELoss()(V_rewards[mask], Q_rewards[mask])
+        else:
+            L2 = torch.tensor(0.0)
+        
+        return L2
 

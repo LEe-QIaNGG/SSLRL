@@ -265,6 +265,10 @@ class DQNPolicy(BasePolicy[TDQNTrainingStats], Generic[TDQNTrainingStats]):
         Typical usage is to update the sampling weight in prioritized
         experience replay. Used in :meth:`update`.
         """
-
-        alpha = 1 - np.exp(-self._iter / 50000)  
-        self.reward_estimator.update(batch,buffer, alpha,self._iter)
+        if self._iter < 10000:
+            alpha = 1 - np.exp(-self._iter / 50000)  
+            self.reward_estimator.update(batch,buffer, alpha,self._iter)
+        else:
+            alpha = 0.5
+            self.reward_estimator.update(batch,buffer, alpha,self._iter)
+            print('iter:',self._iter)

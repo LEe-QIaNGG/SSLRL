@@ -6,10 +6,10 @@ import sys
 import gymnasium as gym 
 
 import numpy as np
-import envpool
+# import envpool
 import torch
-from atari_network import DQN
-from atari_wrapper import make_atari_env
+# from atari_network import DQN
+# from atari_wrapper import make_atari_env
 from tianshou.utils.net.common import Net
 from gymnasium.spaces import Box, Discrete, MultiBinary, MultiDiscrete
 
@@ -43,8 +43,8 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--step-per-epoch", type=int, default=5000)
     parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
-    parser.add_argument("--batch-size", type=int, default=16)  
-    parser.add_argument("--training-num", type=int, default=2)  
+    parser.add_argument("--batch-size", type=int, default=128)  
+    parser.add_argument("--training-num", type=int, default=8)  
     parser.add_argument("--test-num", type=int, default=2) 
     parser.add_argument("--logdir", type=str, default="log")
     parser.add_argument("--render", type=float, default=0.0)
