@@ -58,8 +58,8 @@ class Reward_Estimator:
     
     def smooth_augment(self, input_data, n=3):
         # 分离action列
-        data_without_action = input_data[:, :-1]
-        action = input_data[:, -1:]
+        data_without_action = input_data[:, :-self.act_dim]
+        action = input_data[:, -self.act_dim:]
         
         # 对除action外的数据进行n条数据间的平滑操作
         smoothed_data = torch.zeros_like(data_without_action)
