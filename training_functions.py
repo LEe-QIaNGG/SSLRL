@@ -28,7 +28,8 @@ class Reward_Estimator:
         action = action.unsqueeze(1)  # 添加这一行
         return torch.cat([obs, next_obs, action], dim=-1).float()
     
-    def cutout_augment(self, input_data, n=4):
+    def cutout_augment(self, input_data):
+        n = int(np.log2(self.act_dim) / 2)
         # 分离action列
         data_without_action = input_data[:, :-self.act_dim]
         action = input_data[:, -self.act_dim:]
@@ -75,30 +76,34 @@ class Reward_Estimator:
         # ~操作符用于取反，因为我们要找的是不在true_reward中的项
         return ~np.isin(buffer.rew, self.true_reward)
 
-    def update_network(self, buffer, alpha):
+    def update_network(self, buffer, alpha,is_L2=False):
         # 分别计算非零奖励和零奖励的损失
         mask_nonzero = buffer.rew != 0
         mask_zero = buffer.rew == 0
 
         # # 计算真实奖励的损失
         input_data_nonzero = self.get_input_data(buffer, mask_nonzero)
-        confidence_scores, loss2 = self.get_QVconfidence(input_data_nonzero, is_L2=True)
+        confidence_scores, loss2 = self.get_QVconfidence(input_data_nonzero, is_L2=is_L2)
         max_confidence, max_indices = torch.max(confidence_scores, dim=1)
         predicted_reward = torch.tensor([self.reward_list[i] if conf > self.threshold else 0 for i, conf in zip(max_indices, max_confidence)])
         loss_nonzero = torch.nn.MSELoss()(predicted_reward, torch.tensor(buffer.rew[mask_nonzero]))
         
         #constancy regularization
         input_data_zero = self.get_input_data(buffer, mask_zero)
+
+        #data augmentation
         input_data_zero_weak = self.GaussianNoise_augment(input_data_zero)
         input_data_zero_strong = self.smooth_augment(input_data_zero)
 
-        confidence_scores_weak,loss_constancy_weak = self.get_QVconfidence(input_data_zero_weak, is_L2=True)
-        confidence_scores_strong,loss_constancy_strong = self.get_QVconfidence(input_data_zero_strong, is_L2=True)
-        
+        confidence_scores_weak,loss_constancy_weak = self.get_QVconfidence(input_data_zero_weak, is_L2=is_L2)
+        confidence_scores_strong,loss_constancy_strong = self.get_QVconfidence(input_data_zero_strong, is_L2=is_L2)
         # 计算交叉熵损失
         loss_zero = torch.nn.CrossEntropyLoss()(confidence_scores_strong, confidence_scores_weak.argmax(dim=1))
-
-        Loss_total = (1-alpha)*loss_nonzero  + alpha * loss_zero+loss2+loss_constancy_weak+loss_constancy_strong    
+        if is_L2:
+            loss2=loss_constancy_weak+loss_constancy_strong+loss2
+            Loss_total = (1-alpha)*loss_nonzero  + alpha * loss_zero + loss2    
+        else:
+            Loss_total = (1-alpha)*loss_nonzero  + alpha * loss_zero
         self.optim_Q.zero_grad()
         self.optim_V.zero_grad()
         Loss_total.backward()
@@ -124,8 +129,7 @@ class Reward_Estimator:
             masked_input = input_data[mask]
                 
             # 通过网络获取置信度
-            confidence_scores = self.get_QVconfidence(masked_input,is_L2=False)
-                
+            confidence_scores, _ = self.get_QVconfidence(masked_input,is_L2=False)
             # 获取最大置信度及其索引
             max_confidence, max_indices = torch.max(confidence_scores.cpu(), dim=1)
                 
@@ -152,7 +156,7 @@ class Reward_Estimator:
         
         if update_flag:
             self.update_reward(buffer,alpha)
-            print("奖励不为零")
+            # print("奖励不为零")
         # else:
         #     print("奖励全为0，不更新")
 
@@ -177,7 +181,7 @@ class Reward_Estimator:
             V_confidence=self.Vnet(obs)
             L2=self.calculate_L2(V_confidence, Q_confidence)
             return total_confidence, L2
-        return total_confidence
+        return total_confidence, torch.tensor(0.0)
 
     def calculate_L2(self, V_confidence, Q_confidence):
         # 获取V和Q的最大置信度值及其索引
