@@ -28,7 +28,22 @@ class Reward_Estimator:
         action = action.unsqueeze(1)  # 添加这一行
         return torch.cat([obs, next_obs, action], dim=-1).float()
     
-    def weak_augment(self, input_data):
+    def cutout_augment(self, input_data, n=4):
+        # 分离action列
+        data_without_action = input_data[:, :-self.act_dim]
+        action = input_data[:, -self.act_dim:]
+        
+        # 随机选择n列
+        num_cols = data_without_action.shape[1]
+        cols_to_zero = torch.randperm(num_cols)[:n]
+        
+        # 将选中的列置为零
+        data_without_action[:, cols_to_zero] = 0
+        
+        # 重新组合数据
+        return torch.cat([data_without_action, action], dim=-1)
+
+    def GaussianNoise_augment(self, input_data):
         # 分离action列
         data_without_action = input_data[:, :-1]
         action = input_data[:, -1:]
@@ -40,7 +55,7 @@ class Reward_Estimator:
         # 重新组合数据
         return torch.cat([augmented_data, action], dim=-1)
     
-    def strong_augment(self, input_data, n=3):
+    def smooth_augment(self, input_data, n=3):
         # 分离action列
         data_without_action = input_data[:, :-1]
         action = input_data[:, -1:]
@@ -74,8 +89,8 @@ class Reward_Estimator:
         
         #constancy regularization
         input_data_zero = self.get_input_data(buffer, mask_zero)
-        input_data_zero_weak = self.weak_augment(input_data_zero)
-        input_data_zero_strong = self.strong_augment(input_data_zero)
+        input_data_zero_weak = self.GaussianNoise_augment(input_data_zero)
+        input_data_zero_strong = self.smooth_augment(input_data_zero)
 
         confidence_scores_weak,loss_constancy_weak = self.get_QVconfidence(input_data_zero_weak, is_L2=True)
         confidence_scores_strong,loss_constancy_strong = self.get_QVconfidence(input_data_zero_strong, is_L2=True)
@@ -118,7 +133,7 @@ class Reward_Estimator:
             update_mask = max_confidence > self.threshold
             if torch.any(update_mask):
                 new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
-                buffer.rew[mask][update_mask] = new_rewards.numpy()
+                buffer.rew[mask][update_mask] = new_rewards.numpy()*(1-alpha)
         
 
     def update(self, batch, buffer, alpha, iter):
