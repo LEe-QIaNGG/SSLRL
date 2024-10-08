@@ -28,6 +28,35 @@ class Reward_Estimator:
         action = action.unsqueeze(1)  # 添加这一行
         return torch.cat([obs, next_obs, action], dim=-1).float()
     
+    def shannon_augment(self, input_data):
+        data_without_action = input_data[:, :-self.act_dim]
+        action = input_data[:, -self.act_dim:]
+        
+        # 将data_without_action纵向分为n个块
+        n = 4  # 可以根据需要调整块的数量
+        chunk_size = data_without_action.shape[1] // n
+        chunks = [data_without_action[:, i*chunk_size:(i+1)*chunk_size] for i in range(n)]
+        
+        # 计算每个块的香农熵并乘以相应的块
+        augmented_chunks = []
+        for chunk in chunks:
+            # 将数据离散化
+            binned_data = torch.histc(chunk, bins=256, min=chunk.min(), max=chunk.max())
+            # 计算概率分布
+            probs = binned_data / binned_data.sum()
+            # 计算香农熵
+            entropy = -torch.sum(probs * torch.log2(probs + 1e-10))
+            # 将块乘以其香农熵
+            augmented_chunks.append(chunk * entropy.item())
+        
+        # 拼接增强后的数据块
+        augmented_data = torch.cat(augmented_chunks, dim=1)
+        
+        # 重新组合数据并返回
+        return torch.cat([augmented_data, action], dim=-1)
+
+        
+
     def cutout_augment(self, input_data):
         n = int(np.log2(self.act_dim) / 2)
         # 分离action列
@@ -46,8 +75,8 @@ class Reward_Estimator:
 
     def GaussianNoise_augment(self, input_data):
         # 分离action列
-        data_without_action = input_data[:, :-1]
-        action = input_data[:, -1:]
+        data_without_action = input_data[:, :-self.act_dim]
+        action = input_data[:, -self.act_dim:]
         
         # 对除action外的数据添加高斯噪声
         noise = torch.randn_like(data_without_action) * 0.1  # 0.1是噪声强度，可以根据需要调整
