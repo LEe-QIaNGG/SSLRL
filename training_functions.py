@@ -1,22 +1,26 @@
 # -*- coding: utf-8 -*-
 import torch
 import numpy as np
-from network import ResNet
+from network import ResNet,FCNet
     
 class Reward_Estimator:
-    def __init__(self, obs_dim, act_dim,device):
+    def __init__(self, obs_dim, act_dim,device,network_type='FCNet'):
         '''要求环境的action是discrete
         
 
         '''
         self.obs_dim = obs_dim
         self.act_dim = act_dim
-        self.num_reward = 5
-        self.Qnet = ResNet(obs_dim+act_dim, self.num_reward).to(device)
-        self.Vnet = ResNet(obs_dim, self.num_reward ).to(device)
+        self.num_reward = 10
+        if network_type == 'ResNet':
+            self.Qnet = ResNet(obs_dim+act_dim, self.num_reward).to(device)
+            self.Vnet = ResNet(obs_dim, self.num_reward ).to(device)
+        elif network_type == 'FCNet':
+            self.Qnet = FCNet(obs_dim+act_dim, self.num_reward).to(device)
+            self.Vnet = FCNet(obs_dim, self.num_reward).to(device)
         self.optim_Q= torch.optim.Adam(self.Qnet.parameters(), lr=1e-3)
         self.optim_V= torch.optim.Adam(self.Vnet.parameters(), lr=1e-3)
-        self.reward_list=[-2,-1,0,1,2]
+        self.reward_list = [0] * self.num_reward
         self.true_reward=[]
         self.threshold=0.7
         self.device=device
@@ -28,12 +32,11 @@ class Reward_Estimator:
         action = action.unsqueeze(1)  # 添加这一行
         return torch.cat([obs, next_obs, action], dim=-1).float()
     
-    def shannon_augment(self, input_data):
+    def shannon_augment(self, input_data, n=16):
         data_without_action = input_data[:, :-self.act_dim]
         action = input_data[:, -self.act_dim:]
         
         # 将data_without_action纵向分为n个块
-        n = 4  # 可以根据需要调整块的数量
         chunk_size = data_without_action.shape[1] // n
         chunks = [data_without_action[:, i*chunk_size:(i+1)*chunk_size] for i in range(n)]
         
@@ -53,9 +56,7 @@ class Reward_Estimator:
         augmented_data = torch.cat(augmented_chunks, dim=1)
         
         # 重新组合数据并返回
-        return torch.cat([augmented_data, action], dim=-1)
-
-        
+        return torch.cat([augmented_data, action], dim=-1) 
 
     def cutout_augment(self, input_data):
         n = int(np.log2(self.act_dim) / 2)
@@ -139,6 +140,26 @@ class Reward_Estimator:
         self.optim_Q.step()
         self.optim_V.step()
 
+    def update_true_reward(self, reward):
+        non_zero_rewards = reward[reward != 0]
+        if len(non_zero_rewards) == 0:
+            return
+        old_min = min(self.true_reward) if self.true_reward else float('inf')
+        old_max = max(self.true_reward) if self.true_reward else float('-inf')
+        
+        for r in non_zero_rewards:
+            if r.item() not in self.true_reward:
+                self.true_reward.append(r.item())
+        
+        new_min = min(self.true_reward)
+        new_max = max(self.true_reward)
+        
+        if new_min != old_min or new_max != old_max:
+            min_value = min(new_min, 0)
+            self.reward_list = np.linspace(min_value, new_max, self.num_reward).tolist()
+            print('\nreward list:', self.reward_list)
+            print('\ntrue reward:', self.true_reward)
+
     def update_reward(self, buffer, alpha):
         # 获取buffer中的obs、obs_next和act
         obs = torch.tensor(buffer.obs)
@@ -168,17 +189,18 @@ class Reward_Estimator:
                 new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
                 buffer.rew[mask][update_mask] = new_rewards.numpy()*(1-alpha)
         
-
     def update(self, batch, buffer, alpha, iter):
         '''更新reward估计网络，再修改奖励'''
         update_flag = False
         if iter == 1:
             buffer_rew = torch.tensor(buffer.rew)
+            self.update_true_reward(buffer_rew)
             if not torch.all(buffer_rew == 0):
                 self.update_network(buffer, alpha)
                 update_flag = True
         else:
             batch_rew = torch.tensor(batch.rew)
+            self.update_true_reward(batch_rew)
             if not torch.all(batch_rew == 0):
                 self.update_network(batch, alpha)
                 update_flag = True

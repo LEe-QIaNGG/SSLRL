@@ -32,3 +32,24 @@ class ResNet(torch.nn.Module):
         x = self.fc_out(x)
         x = self.softmax(x)
         return x
+
+class FCNet(torch.nn.Module):
+    def __init__(self, input_dim, num_reward):
+        super(FCNet, self).__init__()
+        self.fc1 = torch.nn.Linear(input_dim, 128)
+        self.fc2 = torch.nn.Linear(128, 64)
+        self.fc3 = torch.nn.Linear(64, 32)
+        self.fc_out = torch.nn.Linear(32, num_reward)
+        self.dropout = torch.nn.Dropout(0.2)
+        self.softmax = torch.nn.Softmax(dim=-1)
+
+    def forward(self, x):
+        x = torch.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = torch.relu(self.fc2(x))
+        x = self.dropout(x)
+        x = torch.relu(self.fc3(x))
+        x = self.dropout(x)
+        x = self.fc_out(x)
+        x = self.softmax(x)
+        return x

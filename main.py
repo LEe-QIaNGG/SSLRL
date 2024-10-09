@@ -47,6 +47,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--training-num", type=int, default=8)  
     parser.add_argument("--test-num", type=int, default=2) 
     parser.add_argument("--logdir", type=str, default="log")
+    # parser.add_argument("--logdir", type=str, default="log_test")
     parser.add_argument("--render", type=float, default=0.0)
     parser.add_argument(
         "--device",
