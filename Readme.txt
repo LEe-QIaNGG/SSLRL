@@ -1,5 +1,6 @@
 ./main.py --debug
 tmux kill-session -t
+tmux attach-session -t 
 tensorboard --logdir=~/pytorch-ddpg/ray_results --port 6006
 tensorboard --logdir=~/pytorch-ddpg/log/MontezumaRevenge-ram-v4/dqn/0 --port 6006
 tensorboard --logdir=log/Seaquest-ram-v4/dqn/baseline/ --port 6006

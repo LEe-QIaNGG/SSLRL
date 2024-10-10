@@ -74,13 +74,13 @@ class Reward_Estimator:
         # 重新组合数据
         return torch.cat([data_without_action, action], dim=-1)
 
-    def GaussianNoise_augment(self, input_data):
+    def GaussianNoise_augment(self, input_data,sigma=0.1):
         # 分离action列
         data_without_action = input_data[:, :-self.act_dim]
         action = input_data[:, -self.act_dim:]
         
         # 对除action外的数据添加高斯噪声
-        noise = torch.randn_like(data_without_action) * 0.1  # 0.1是噪声强度，可以根据需要调整
+        noise = torch.randn_like(data_without_action) * sigma  # 0.1是噪声强度，可以根据需要调整
         augmented_data = data_without_action + noise
         
         # 重新组合数据
@@ -106,7 +106,7 @@ class Reward_Estimator:
         # ~操作符用于取反，因为我们要找的是不在true_reward中的项
         return ~np.isin(buffer.rew, self.true_reward)
 
-    def update_network(self, buffer, alpha,is_L2=False):
+    def update_network(self, buffer, alpha,is_L2=True):
         # 分别计算非零奖励和零奖励的损失
         mask_nonzero = buffer.rew != 0
         mask_zero = buffer.rew == 0
@@ -123,7 +123,7 @@ class Reward_Estimator:
 
         #data augmentation
         input_data_zero_weak = self.GaussianNoise_augment(input_data_zero)
-        input_data_zero_strong = self.smooth_augment(input_data_zero)
+        input_data_zero_strong = self.shannon_augment(input_data_zero)
 
         confidence_scores_weak,loss_constancy_weak = self.get_QVconfidence(input_data_zero_weak, is_L2=is_L2)
         confidence_scores_strong,loss_constancy_strong = self.get_QVconfidence(input_data_zero_strong, is_L2=is_L2)
@@ -156,11 +156,11 @@ class Reward_Estimator:
         
         if new_min != old_min or new_max != old_max:
             min_value = min(new_min, 0)
-            self.reward_list = np.linspace(min_value, new_max, self.num_reward).tolist()
+            self.reward_list = np.linspace(min_value, new_max-1, self.num_reward).tolist()
             print('\nreward list:', self.reward_list)
             print('\ntrue reward:', self.true_reward)
 
-    def update_reward(self, buffer, alpha):
+    def update_reward(self, buffer,iter,alpha):
         # 获取buffer中的obs、obs_next和act
         obs = torch.tensor(buffer.obs)
         obs_next = torch.tensor(buffer.obs_next)
@@ -169,12 +169,19 @@ class Reward_Estimator:
         # 拼接输入数据
         input_data = torch.cat([obs, obs_next, act], dim=-1).float().to(self.device)
         
-        # 获取当前奖励
-        current_rewards = torch.tensor(buffer.rew)
-        
         # 对于buffer中reward不等于true_reward里的值的项
         mask = self.calculate_mask(buffer)
-        if np.any(mask):
+        # if iter%100 == 0:
+        #     print('真实reward的数量:', np.sum(~mask))
+        
+        mask = torch.from_numpy(mask)  
+        mask = torch.where(torch.rand_like(mask.float()) < (1 - alpha), torch.zeros_like(mask,dtype=torch.bool), mask)
+
+        # if iter%100 == 0:
+        #     print("\nmask:",mask)  
+        #     print('len:',len(mask))
+        #     print('更新数量:', torch.sum(mask))
+        if torch.any(mask):
             # 获取满足条件的输入数据
             masked_input = input_data[mask]
                 
@@ -187,10 +194,9 @@ class Reward_Estimator:
             update_mask = max_confidence > self.threshold
             if torch.any(update_mask):
                 new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
-                buffer.rew[mask][update_mask] = new_rewards.numpy()*(1-alpha)
+                buffer.rew[mask][update_mask] = new_rewards.numpy()
         
     def update(self, batch, buffer, alpha, iter):
-        '''更新reward估计网络，再修改奖励'''
         update_flag = False
         if iter == 1:
             buffer_rew = torch.tensor(buffer.rew)
@@ -206,7 +212,7 @@ class Reward_Estimator:
                 update_flag = True
         
         if update_flag:
-            self.update_reward(buffer,alpha)
+            self.update_reward(buffer,iter,alpha)
             # print("奖励不为零")
         # else:
         #     print("奖励全为0，不更新")
