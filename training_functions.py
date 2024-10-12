@@ -123,7 +123,7 @@ class Reward_Estimator:
 
         #data augmentation
         input_data_zero_weak = self.GaussianNoise_augment(input_data_zero)
-        input_data_zero_strong = self.shannon_augment(input_data_zero)
+        input_data_zero_strong = self.smooth_augment(input_data_zero)
 
         confidence_scores_weak,loss_constancy_weak = self.get_QVconfidence(input_data_zero_weak, is_L2=is_L2)
         confidence_scores_strong,loss_constancy_strong = self.get_QVconfidence(input_data_zero_strong, is_L2=is_L2)
@@ -165,8 +165,6 @@ class Reward_Estimator:
         obs = torch.tensor(buffer.obs)
         obs_next = torch.tensor(buffer.obs_next)
         act = torch.tensor(buffer.act).unsqueeze(-1)
-        
-        # 拼接输入数据
         input_data = torch.cat([obs, obs_next, act], dim=-1).float().to(self.device)
         
         # 对于buffer中reward不等于true_reward里的值的项
@@ -213,9 +211,7 @@ class Reward_Estimator:
         
         if update_flag:
             self.update_reward(buffer,iter,alpha)
-            # print("奖励不为零")
-        # else:
-        #     print("奖励全为0，不更新")
+
 
         
         
