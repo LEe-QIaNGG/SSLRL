@@ -123,7 +123,7 @@ class Reward_Estimator:
 
         #data augmentation
         input_data_zero_weak = self.GaussianNoise_augment(input_data_zero)
-        input_data_zero_strong = self.smooth_augment(input_data_zero)
+        input_data_zero_strong = self.shannon_augment(input_data_zero)
 
         confidence_scores_weak,loss_constancy_weak = self.get_QVconfidence(input_data_zero_weak, is_L2=is_L2)
         confidence_scores_strong,loss_constancy_strong = self.get_QVconfidence(input_data_zero_strong, is_L2=is_L2)
