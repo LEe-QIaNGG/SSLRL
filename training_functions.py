@@ -4,7 +4,7 @@ import numpy as np
 from network import ResNet,FCNet
     
 class Reward_Estimator:
-    def __init__(self, obs_dim, act_dim,device,network_type='FCNet'):
+    def __init__(self, obs_dim, act_dim,device,network_type='FCNet',data_augmentation=None,is_L2=False):
         '''要求环境的action是discrete
         
 
@@ -24,6 +24,8 @@ class Reward_Estimator:
         self.true_reward=[]
         self.threshold=0.7
         self.device=device
+        self.data_augmentation=data_augmentation
+        self.is_L2=is_L2
 
     def get_input_data(self, buffer, mask_nonzero):
         obs = torch.tensor(buffer.obs[mask_nonzero], device=self.device)
@@ -106,7 +108,8 @@ class Reward_Estimator:
         # ~操作符用于取反，因为我们要找的是不在true_reward中的项
         return ~np.isin(buffer.rew, self.true_reward)
 
-    def update_network(self, buffer, alpha,is_L2=True):
+    def update_network(self, buffer, alpha):
+        is_L2=self.is_L2
         # 分别计算非零奖励和零奖励的损失
         mask_nonzero = buffer.rew != 0
         mask_zero = buffer.rew == 0
@@ -123,7 +126,12 @@ class Reward_Estimator:
 
         #data augmentation
         input_data_zero_weak = self.GaussianNoise_augment(input_data_zero)
-        input_data_zero_strong = self.shannon_augment(input_data_zero)
+        if self.data_augmentation=='shannon':
+            input_data_zero_strong = self.shannon_augment(input_data_zero)
+        elif self.data_augmentation=='cutout':
+            input_data_zero_strong = self.cutout_augment(input_data_zero)
+        elif self.data_augmentation=='smooth':
+            input_data_zero_strong = self.smooth_augment(input_data_zero)
 
         confidence_scores_weak,loss_constancy_weak = self.get_QVconfidence(input_data_zero_weak, is_L2=is_L2)
         confidence_scores_strong,loss_constancy_strong = self.get_QVconfidence(input_data_zero_strong, is_L2=is_L2)
@@ -171,9 +179,15 @@ class Reward_Estimator:
         mask = self.calculate_mask(buffer)
         # if iter%100 == 0:
         #     print('真实reward的数量:', np.sum(~mask))
-        
-        mask = torch.from_numpy(mask)  
-        mask = torch.where(torch.rand_like(mask.float()) < (1 - alpha), torch.zeros_like(mask,dtype=torch.bool), mask)
+        num_real_reward=np.sum(~mask)
+        mask = torch.from_numpy(mask)
+        if iter<200000:
+            update_prob=np.log(num_real_reward/len(mask))
+        elif iter<400000:
+            update_prob=num_real_reward/len(mask)
+        else:
+            update_prob=1-alpha
+        mask = torch.where(torch.rand_like(mask.float()) < update_prob, torch.zeros_like(mask,dtype=torch.bool), mask)
 
         # if iter%100 == 0:
         #     print("\nmask:",mask)  

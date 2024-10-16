@@ -1,10 +1,11 @@
+# -*- coding: utf-8 -*-
 import argparse
 import datetime
 import os
 import pprint
 import sys
 import gymnasium as gym 
-
+from atari_network import DQN
 import numpy as np
 # import envpool
 import torch
@@ -14,16 +15,14 @@ from tianshou.utils.net.common import Net
 from gymnasium.spaces import Box, Discrete, MultiBinary, MultiDiscrete
 
 import tianshou as ts
-from tianshou.data import Collector, CollectStats    , VectorReplayBuffer
-# from Buffer import VectorReplayBuffer
+from tianshou.data import Collector, CollectStats, VectorReplayBuffer
 from tianshou.highlevel.logger import LoggerFactoryDefault
-from Policy import DQNPolicy
+from tianshou.policy import DQNPolicy
 from tianshou.policy.base import BasePolicy
 from tianshou.policy.modelbased.icm import ICMPolicy
 from tianshou.trainer import OffpolicyTrainer
 from tianshou.utils.net.discrete import IntrinsicCuriosityModule
 from tianshou.utils.space_info import SpaceInfo
-from training_functions import Reward_Estimator
 
 
 def get_args() -> argparse.Namespace:
@@ -45,9 +44,8 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--update-per-step", type=float, default=0.1)
     parser.add_argument("--batch-size", type=int, default=128)  
     parser.add_argument("--training-num", type=int, default=8)  
-    parser.add_argument("--test-num", type=int, default=2) 
+    parser.add_argument("--test-num", type=int, default=2)  
     parser.add_argument("--logdir", type=str, default="log")
-    # parser.add_argument("--logdir", type=str, default="log_test")
     parser.add_argument("--render", type=float, default=0.0)
     parser.add_argument(
         "--device",
@@ -74,7 +72,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--icm-lr-scale",
         type=float,
-        default=0.0,
+        default=0.2,
         help="use intrinsic curiosity module with this lr scale",
     )
     parser.add_argument(
@@ -89,51 +87,69 @@ def get_args() -> argparse.Namespace:
         default=0.2,
         help="weight for the forward model loss in ICM",
     )
-    parser.add_argument(
-        "--is_L2",
-        type=bool,
-        default=False,
-        help="weight for the forward model loss in ICM",
-    )
-    parser.add_argument(
-        "--data_augmentation",
-        type=str,
-        default="smooth",
-        help="cutout,shannon,smooth",
-    )
     return parser.parse_args()
 
 
 def main(args: argparse.Namespace = get_args()) -> None:
-    env = gym.make(args.task)
-    train_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.training_num)])
-    test_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.test_num)])
 
+    # print(envpool.list_all_envs())
+    # env, train_envs, test_envs = make_atari_env(
+    #     args.task,
+    #     args.seed,
+    #     args.training_num,
+    #     args.test_num,
+    #     scale=args.scale_obs,
+    #     frame_stack=args.frames_stack,
+    # )
+
+    env = gym.make(args.task)
+
+    train_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.training_num)])
+
+    test_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.test_num)])
     args.state_shape = env.observation_space.shape or env.observation_space.n
     args.action_shape = env.action_space.shape or env.action_space.n
     # should be N_FRAMES x H x W
     print("Observations shape:", args.state_shape)
     print("Actions shape:", args.action_shape)
-    assert isinstance(env.action_space, Discrete)
     # seed
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    space_info = SpaceInfo.from_env(env)
-    state_shape = space_info.observation_info.obs_shape
-    action_shape = space_info.action_info.action_shape
-    net = Net(state_shape=state_shape, action_shape=action_shape, hidden_sizes=[128, 128, 128],device=args.device)
+
+    net = DQN(*args.state_shape, args.action_shape, args.device).to(args.device)
     optim = torch.optim.Adam(net.parameters(), lr=args.lr)
-    reward_estimator=Reward_Estimator(args.state_shape[0], act_dim=1,device=args.device,data_augmentation=args.data_augmentation,is_L2=args.is_L2)
     # define policy
-    policy= DQNPolicy(
+    policy: DQNPolicy | ICMPolicy
+    policy = DQNPolicy(
         model=net,
         optim=optim,
         action_space=env.action_space,
         discount_factor=args.gamma,
-        estimation_step=args.n_step,#  n step  DQN
+        estimation_step=args.n_step,
         target_update_freq=args.target_update_freq,
-        reward_estimator=reward_estimator,
-    ).to(args.device)
+    )
+    if args.icm_lr_scale > 0:
+        feature_net = DQN(*args.state_shape, args.action_shape, args.device, features_only=True)
+        action_dim = np.prod(args.action_shape)
+        feature_dim = feature_net.output_dim
+        icm_net = IntrinsicCuriosityModule(
+            feature_net.net,
+            feature_dim,
+            action_dim,
+            hidden_sizes=[512],
+            device=args.device,
+        )
+        icm_optim = torch.optim.Adam(icm_net.parameters(), lr=args.lr)
+        policy = ICMPolicy(
+            policy=policy,
+            model=icm_net,
+            optim=icm_optim,
+            action_space=env.action_space,
+            lr_scale=args.icm_lr_scale,
+            reward_scale=args.icm_reward_scale,
+            forward_loss_weight=args.icm_forward_loss_weight,
+        ).to(args.device)
+
 
     # load a previous policy
     if args.resume_path:
@@ -144,7 +160,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     buffer = VectorReplayBuffer(
         args.buffer_size,
         buffer_num=args.training_num,
-        # ignore_obs_next=True,
+        ignore_obs_next=True,
         # save_only_last_obs=True,
         # stack_num=args.frames_stack,
     )
@@ -155,7 +171,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     # log
     now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
     args.algo_name = "dqn_icm" if args.icm_lr_scale > 0 else "dqn"
-    log_name = os.path.join(args.task, args.algo_name, 'sslrl',args.data_augmentation+' L2 '+str(args.is_L2)+now)
+    log_name = os.path.join(args.task, args.algo_name, 'ICM', now)
     log_path = os.path.join(args.logdir, log_name)
 
     # logger
@@ -192,7 +208,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
         policy.set_eps(eps)
         if env_step % 1000 == 0:
             logger.write("train/env_step", env_step, {"train/eps": eps})
-        
+
     def test_fn(epoch: int, env_step: int | None) -> None:
         policy.set_eps(args.eps_test)
 
@@ -231,7 +247,9 @@ def main(args: argparse.Namespace = get_args()) -> None:
         watch()
         sys.exit(0)
 
-
+    # test train_collector and start filling replay buffer
+    train_collector.reset()
+    train_collector.collect(n_step=args.batch_size * args.training_num)
     # trainer
     result = OffpolicyTrainer(
         policy=policy,

@@ -7,10 +7,8 @@ import sys
 import gymnasium as gym 
 
 import numpy as np
-# import envpool
+
 import torch
-# from atari_network import DQN
-# from atari_wrapper import make_atari_env
 from tianshou.utils.net.common import Net
 from gymnasium.spaces import Box, Discrete, MultiBinary, MultiDiscrete
 
@@ -197,7 +195,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
 
     def save_checkpoint_fn(epoch: int, env_step: int, gradient_step: int) -> str:
         # see also: https://pytorch.org/tutorials/beginner/saving_loading_models.html
-        ckpt_path = os.path.join(log_path, f"checkpoint_{epoch}.pth")
+        ckpt_path = os.path.join(log_path, f"checkpoint.pth")
         torch.save({"model": policy.state_dict()}, ckpt_path)
         return ckpt_path
 

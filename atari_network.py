@@ -58,9 +58,7 @@ class DQN(NetBase[Any]):
 
     def __init__(
         self,
-        c: int,
-        h: int,
-        w: int,
+        input_dim: int,
         action_shape: Sequence[int] | int,
         device: str | int | torch.device = "cpu",
         features_only: bool = False,
@@ -75,34 +73,33 @@ class DQN(NetBase[Any]):
         super().__init__()
         self.device = device
         self.net = nn.Sequential(
-            layer_init(nn.Conv2d(c, 32, kernel_size=8, stride=1)),
+            layer_init(nn.Linear(input_dim, 128)),
             nn.ReLU(inplace=True),
-            layer_init(nn.Conv2d(32, 64, kernel_size=4, stride=2)),
+            layer_init(nn.Linear(128, 256)),
             nn.ReLU(inplace=True),
-            layer_init(nn.Conv2d(64, 64, kernel_size=3, stride=1)),
+            layer_init(nn.Linear(256, 256)),
             nn.ReLU(inplace=True),
-            nn.Flatten(),
+            layer_init(nn.Linear(256, 128)),
+            nn.ReLU(inplace=True),
+            layer_init(nn.Linear(128, 64)),
+            nn.ReLU(inplace=True),
         )
-        with torch.no_grad():
-            base_cnn_output_dim = int(np.prod(self.net(torch.zeros(1, c, h, w)).shape[1:]))
         if not features_only:
             action_dim = int(np.prod(action_shape))
             self.net = nn.Sequential(
                 self.net,
-                layer_init(nn.Linear(base_cnn_output_dim, 512)),
-                nn.ReLU(inplace=True),
-                layer_init(nn.Linear(512, action_dim)),
+                layer_init(nn.Linear(64, action_dim)),
             )
             self.output_dim = action_dim
         elif output_dim_added_layer is not None:
             self.net = nn.Sequential(
                 self.net,
-                layer_init(nn.Linear(base_cnn_output_dim, output_dim_added_layer)),
+                layer_init(nn.Linear(64, output_dim_added_layer)),
                 nn.ReLU(inplace=True),
             )
             self.output_dim = output_dim_added_layer
         else:
-            self.output_dim = base_cnn_output_dim
+            self.output_dim = 64
 
     def forward(
         self,
