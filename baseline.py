@@ -89,15 +89,6 @@ def get_args() -> argparse.Namespace:
 
 
 def main(args: argparse.Namespace = get_args()) -> None:
-    # print(envpool.list_all_envs())
-    # env, train_envs, test_envs = make_atari_env(
-    #     args.task,
-    #     args.seed,
-    #     args.training_num,
-    #     args.test_num,
-    #     scale=args.scale_obs,
-    #     frame_stack=args.frames_stack,
-    # )
 
     env = gym.make(args.task)
     train_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.training_num)])

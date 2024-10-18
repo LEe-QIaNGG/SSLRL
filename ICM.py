@@ -92,16 +92,6 @@ def get_args() -> argparse.Namespace:
 
 def main(args: argparse.Namespace = get_args()) -> None:
 
-    # print(envpool.list_all_envs())
-    # env, train_envs, test_envs = make_atari_env(
-    #     args.task,
-    #     args.seed,
-    #     args.training_num,
-    #     args.test_num,
-    #     scale=args.scale_obs,
-    #     frame_stack=args.frames_stack,
-    # )
-
     env = gym.make(args.task)
 
     train_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.training_num)])
@@ -148,7 +138,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
             lr_scale=args.icm_lr_scale,
             reward_scale=args.icm_reward_scale,
             forward_loss_weight=args.icm_forward_loss_weight,
-        ).to(args.device)
+        ).to(args.device)  
 
 
     # load a previous policy
@@ -171,7 +161,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     # log
     now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
     args.algo_name = "dqn_icm" if args.icm_lr_scale > 0 else "dqn"
-    log_name = os.path.join(args.task, args.algo_name, 'ICM', now)
+    log_name = os.path.join(args.task, args.algo_name, now)
     log_path = os.path.join(args.logdir, log_name)
 
     # logger

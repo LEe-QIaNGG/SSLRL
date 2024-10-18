@@ -4,7 +4,7 @@ from typing import Any
 import numpy as np
 import torch
 from torch import nn
-
+from tianshou.utils.net.common import MLP
 from tianshou.highlevel.env import Environments
 from tianshou.highlevel.module.actor import ActorFactory
 from tianshou.highlevel.module.core import (
@@ -72,17 +72,16 @@ class DQN(NetBase[Any]):
             )
         super().__init__()
         self.device = device
-        self.net = nn.Sequential(
-            layer_init(nn.Linear(input_dim, 128)),
-            nn.ReLU(inplace=True),
-            layer_init(nn.Linear(128, 256)),
-            nn.ReLU(inplace=True),
-            layer_init(nn.Linear(256, 256)),
-            nn.ReLU(inplace=True),
-            layer_init(nn.Linear(256, 128)),
-            nn.ReLU(inplace=True),
-            layer_init(nn.Linear(128, 64)),
-            nn.ReLU(inplace=True),
+        self.net = MLP(
+            input_dim,
+            output_dim=64,
+            hidden_sizes=[128, 128, 128],
+            norm_layer=None,
+            norm_args=None,
+            activation=nn.ReLU,
+            act_args=None,
+            device=self.device,
+            linear_layer= nn.Linear,
         )
         if not features_only:
             action_dim = int(np.prod(action_shape))
@@ -100,6 +99,8 @@ class DQN(NetBase[Any]):
             self.output_dim = output_dim_added_layer
         else:
             self.output_dim = 64
+
+
 
     def forward(
         self,
