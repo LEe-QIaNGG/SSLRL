@@ -31,18 +31,18 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--eps-test", type=float, default=0.005)
     parser.add_argument("--eps-train", type=float, default=1.0)
     parser.add_argument("--eps-train-final", type=float, default=0.05)
-    parser.add_argument("--buffer-size", type=int, default=50000)  
+    parser.add_argument("--buffer-size", type=int, default=100000)  
     parser.add_argument("--lr", type=float, default=0.0001)
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--n-step", type=int, default=3)
     parser.add_argument("--target-update-freq", type=int, default=500)
-    parser.add_argument("--epoch", type=int, default=2000)
-    parser.add_argument("--step-per-epoch", type=int, default=3000)
-    parser.add_argument("--step-per-collect", type=int, default=8)
+    parser.add_argument("--epoch", type=int, default=100)
+    parser.add_argument("--step-per-epoch", type=int, default=10000)
+    parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
     parser.add_argument("--batch-size", type=int, default=128)  
-    parser.add_argument("--training-num", type=int, default=8)  
-    parser.add_argument("--test-num", type=int, default=2)  
+    parser.add_argument("--training-num", type=int, default=10)  
+    parser.add_argument("--test-num", type=int, default=5)  
     parser.add_argument("--logdir", type=str, default="log")
     parser.add_argument("--render", type=float, default=0.0)
     parser.add_argument(
@@ -142,7 +142,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     # log
     now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
     args.algo_name = "dqn_icm" if args.icm_lr_scale > 0 else "dqn"
-    log_name = os.path.join(args.task, args.algo_name, 'baseline', now)
+    log_name = os.path.join(args.task, 'framework_test', 'baseline_'+ now)
     log_path = os.path.join(args.logdir, log_name)
 
     # logger

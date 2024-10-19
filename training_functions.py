@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import torch
 import numpy as np
+import torchvision
 from network import ResNet,FCNet
     
 class Reward_Estimator:
@@ -87,6 +88,51 @@ class Reward_Estimator:
         
         # 重新组合数据
         return torch.cat([augmented_data, action], dim=-1)
+    
+    def flip_augment(self, input_data):
+        # 分离action列
+        data_without_action = input_data[:, :-self.act_dim]
+        action = input_data[:, -self.act_dim:]
+        
+        # 对除action外的数据进行翻转操作
+        flipped_data = torch.flip(data_without_action, dims=[1])
+        
+        # 重新组合数据
+        return torch.cat([flipped_data, action], dim=-1)
+    
+    def scale_augment(self, input_data, scale_range=(0.8, 1.2)):
+        # 分离action列
+        data_without_action = input_data[:, :-self.act_dim]
+        action = input_data[:, -self.act_dim:]
+        
+        # 创建RandomResizedCrop实例
+        transform = torchvision.transforms.RandomResizedCrop(
+            size=data_without_action.shape[1],
+            scale=scale_range,
+            ratio=(1.0, 1.0)  # 保持宽高比不变
+        )
+        
+        # 对除action外的数据进行RandomResizedCrop操作
+        scaled_data = transform(data_without_action.unsqueeze(0)).squeeze(0)
+        
+        # 重新组合数据并返回
+        return torch.cat([scaled_data, action], dim=-1)
+    
+    def translate_augment(self, input_data, translate_range=(0.1, 0.1)):
+        # 分离action列
+        data_without_action = input_data[:, :-self.act_dim]
+        action = input_data[:, -self.act_dim:]
+        
+        # 创建RandomAffine实例用于平移
+        transform = torchvision.transforms.RandomAffine(
+            degrees=0,  # 不进行旋转
+            translate=translate_range  # 平移范围
+        )
+        # 对除action外的数据进行平移操作
+        translated_data = transform(data_without_action.unsqueeze(0)).squeeze(0)
+        # 重新组合数据并返回
+        return torch.cat([translated_data, action], dim=-1)
+        
     
     def smooth_augment(self, input_data, n=3):
         # 分离action列
