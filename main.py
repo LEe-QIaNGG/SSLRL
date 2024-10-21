@@ -17,6 +17,8 @@ import tianshou as ts
 from tianshou.data import Collector, CollectStats    , VectorReplayBuffer
 # from Buffer import VectorReplayBuffer
 from tianshou.highlevel.logger import LoggerFactoryDefault
+from tianshou.utils.logger.tensorboard import TensorboardLogger
+from torch.utils.tensorboard import SummaryWriter
 from Policy import DQNPolicy
 from tianshou.policy.base import BasePolicy
 from tianshou.policy.modelbased.icm import ICMPolicy
@@ -34,18 +36,18 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--eps-test", type=float, default=0.005)
     parser.add_argument("--eps-train", type=float, default=1.0)
     parser.add_argument("--eps-train-final", type=float, default=0.05)
-    parser.add_argument("--buffer-size", type=int, default=100000)  
+    parser.add_argument("--buffer-size", type=int, default=30000)  
     parser.add_argument("--lr", type=float, default=0.0001)
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--n-step", type=int, default=3)
-    parser.add_argument("--target-update-freq", type=int, default=500)
-    parser.add_argument("--epoch", type=int, default=100)
-    parser.add_argument("--step-per-epoch", type=int, default=10000)
+    parser.add_argument("--target-update-freq", type=int, default=400)
+    parser.add_argument("--epoch", type=int, default=1000)
+    parser.add_argument("--step-per-epoch", type=int, default=2000)
     parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
-    parser.add_argument("--batch-size", type=int, default=128)  
+    parser.add_argument("--batch-size", type=int, default=1024)  
     parser.add_argument("--training-num", type=int, default=10)  
-    parser.add_argument("--test-num", type=int, default=5) 
+    parser.add_argument("--test-num", type=int, default=2) 
     parser.add_argument("--logdir", type=str, default="log")
     # parser.add_argument("--logdir", type=str, default="log_test")
     parser.add_argument("--render", type=float, default=0.0)
@@ -92,13 +94,13 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--is_L2",
         type=bool,
-        default=False,
+        default=True,
         help="weight for the forward model loss in ICM",
     )
     parser.add_argument(
         "--data_augmentation",
         type=str,
-        default="smooth",
+        default="shannon",
         help="cutout,shannon,smooth",
     )
     return parser.parse_args()
@@ -159,19 +161,21 @@ def main(args: argparse.Namespace = get_args()) -> None:
     log_path = os.path.join(args.logdir, log_name)
 
     # logger
-    logger_factory = LoggerFactoryDefault()
-    if args.logger == "wandb":
-        logger_factory.logger_type = "wandb"
-        logger_factory.wandb_project = args.wandb_project
-    else:
-        logger_factory.logger_type = "tensorboard"
+    # logger_factory = LoggerFactoryDefault()
+    # if args.logger == "wandb":
+    #     logger_factory.logger_type = "wandb"
+    #     logger_factory.wandb_project = args.wandb_project
+    # else:
+    #     logger_factory.logger_type = "tensorboard"
 
-    logger = logger_factory.create_logger(
-        log_dir=log_path,
-        experiment_name=log_name,
-        run_id=args.resume_id,
-        config_dict=vars(args),
-    )
+    # logger = logger_factory.create_logger(
+    #     log_dir=log_path,
+    #     experiment_name=log_name,
+    #     run_id=args.resume_id,
+    #     config_dict=vars(args),
+    # )
+
+    logger = TensorboardLogger(SummaryWriter(log_path),train_interval=10000,test_interval=10000,update_interval=10000)
 
     def save_best_fn(policy: BasePolicy) -> None:
         torch.save(policy.state_dict(), os.path.join(log_path, "policy.pth"))
@@ -190,16 +194,17 @@ def main(args: argparse.Namespace = get_args()) -> None:
         else:
             eps = args.eps_train_final
         policy.set_eps(eps)
-        if env_step % 10000 == 0:
-            logger.write("train/env_step", env_step, {"train/eps": eps})
+        # if env_step % 10000 == 0:
+        #     logger.write("train/env_step", env_step, {"train/eps": eps})
         
     def test_fn(epoch: int, env_step: int | None) -> None:
         policy.set_eps(args.eps_test)
 
     def save_checkpoint_fn(epoch: int, env_step: int, gradient_step: int) -> str:
         # see also: https://pytorch.org/tutorials/beginner/saving_loading_models.html
-        ckpt_path = os.path.join(log_path, f"checkpoint.pth")
-        torch.save({"model": policy.state_dict()}, ckpt_path)
+        if env_step % 100 == 0:
+            ckpt_path = os.path.join(log_path, f"checkpoint.pth")
+            torch.save({"model": policy.state_dict()}, ckpt_path)
         return ckpt_path
 
     # watch agent's performance
@@ -247,6 +252,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
         stop_fn=stop_fn,
         save_best_fn=save_best_fn,
         logger=logger,
+        verbose=False,
         update_per_step=args.update_per_step,
         test_in_train=False,
         resume_from_log=args.resume_id is not None,
