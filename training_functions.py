@@ -94,9 +94,17 @@ class Reward_Estimator:
         data_without_action = input_data[:, :-self.act_dim]
         action = input_data[:, -self.act_dim:]
         
-        # 对除action外的数据进行翻转操作
-        flipped_data = torch.flip(data_without_action, dims=[1])
+        # 将data_without_action分为obs和obs_next
+        obs_dim = data_without_action.shape[1] // 2
+        obs = data_without_action[:, :obs_dim]
+        obs_next = data_without_action[:, obs_dim:]
         
+        # 分别对obs和obs_next进行翻转操作
+        flipped_obs = torch.flip(obs, dims=[1])
+        flipped_obs_next = torch.flip(obs_next, dims=[1])
+        
+        # 重新组合翻转后的数据
+        flipped_data = torch.cat([flipped_obs, flipped_obs_next], dim=1)     
         # 重新组合数据
         return torch.cat([flipped_data, action], dim=-1)
     
@@ -105,15 +113,21 @@ class Reward_Estimator:
         data_without_action = input_data[:, :-self.act_dim]
         action = input_data[:, -self.act_dim:]
         
-        # 创建RandomResizedCrop实例
-        transform = torchvision.transforms.RandomResizedCrop(
-            size=data_without_action.shape[1],
-            scale=scale_range,
-            ratio=(1.0, 1.0)  # 保持宽高比不变
-        )
+        # 将data_without_action分为obs和obs_next
+        obs_dim = data_without_action.shape[1] // 2
+        obs = data_without_action[:, :obs_dim]
+        obs_next = data_without_action[:, obs_dim:]
         
-        # 对除action外的数据进行RandomResizedCrop操作
-        scaled_data = transform(data_without_action.unsqueeze(0)).squeeze(0)
+        # 为每个样本生成随机缩放因子
+        batch_size = obs.shape[0]
+        scale_factors = torch.empty(batch_size, 1).uniform_(scale_range[0], scale_range[1]).to(obs.device)
+        
+        # 对obs和obs_next分别进行缩放
+        scaled_obs = obs * scale_factors
+        scaled_obs_next = obs_next * scale_factors
+        
+        # 重新组合缩放后的数据
+        scaled_data = torch.cat([scaled_obs, scaled_obs_next], dim=1)
         
         # 重新组合数据并返回
         return torch.cat([scaled_data, action], dim=-1)
@@ -123,13 +137,24 @@ class Reward_Estimator:
         data_without_action = input_data[:, :-self.act_dim]
         action = input_data[:, -self.act_dim:]
         
+        # 将data_without_action分为obs和obs_next
+        obs_dim = data_without_action.shape[1] // 2
+        obs = data_without_action[:, :obs_dim]
+        obs_next = data_without_action[:, obs_dim:]
+        
         # 创建RandomAffine实例用于平移
         transform = torchvision.transforms.RandomAffine(
             degrees=0,  # 不进行旋转
             translate=translate_range  # 平移范围
         )
-        # 对除action外的数据进行平移操作
-        translated_data = transform(data_without_action.unsqueeze(0)).squeeze(0)
+        
+        # 分别对obs和obs_next进行平移操作
+        translated_obs = transform(obs.unsqueeze(0)).squeeze(0)
+        translated_obs_next = transform(obs_next.unsqueeze(0)).squeeze(0)
+        
+        # 重新组合平移后的数据
+        translated_data = torch.cat([translated_obs, translated_obs_next], dim=1)
+        
         # 重新组合数据并返回
         return torch.cat([translated_data, action], dim=-1)
         
@@ -178,6 +203,12 @@ class Reward_Estimator:
             input_data_zero_strong = self.cutout_augment(input_data_zero)
         elif self.data_augmentation=='smooth':
             input_data_zero_strong = self.smooth_augment(input_data_zero)
+        elif self.data_augmentation=='scale':
+            input_data_zero_strong = self.scale_augment(input_data_zero)
+        elif self.data_augmentation=='translate':
+            input_data_zero_strong = self.translate_augment(input_data_zero)
+        elif self.data_augmentation=='flip':
+            input_data_zero_strong = self.flip_augment(input_data_zero)
 
         confidence_scores_weak,loss_constancy_weak = self.get_QVconfidence(input_data_zero_weak, is_L2=is_L2)
         confidence_scores_strong,loss_constancy_strong = self.get_QVconfidence(input_data_zero_strong, is_L2=is_L2)
@@ -214,7 +245,7 @@ class Reward_Estimator:
             print('\nreward list:', self.reward_list)
             print('\ntrue reward:', self.true_reward)
 
-    def update_reward(self, buffer,iter,alpha):
+    def update_reward(self, buffer,iter,alpha,num_iter=200000):
         # 获取buffer中的obs、obs_next和act
         obs = torch.tensor(buffer.obs)
         obs_next = torch.tensor(buffer.obs_next)
@@ -227,9 +258,9 @@ class Reward_Estimator:
         #     print('真实reward的数量:', np.sum(~mask))
         num_real_reward=np.sum(~mask)
         mask = torch.from_numpy(mask)
-        if iter<200000:
+        if iter<num_iter/3:
             update_prob=np.log(num_real_reward/len(mask))
-        elif iter<400000:
+        elif iter<2*num_iter/3:
             update_prob=num_real_reward/len(mask)
         else:
             update_prob=1-alpha
@@ -320,4 +351,5 @@ class Reward_Estimator:
             L2 = torch.tensor(0.0)
         
         return L2
+
 

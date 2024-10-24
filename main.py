@@ -6,10 +6,7 @@ import sys
 import gymnasium as gym 
 
 import numpy as np
-# import envpool
 import torch
-# from atari_network import DQN
-# from atari_wrapper import make_atari_env
 from tianshou.utils.net.common import Net
 from gymnasium.spaces import Box, Discrete, MultiBinary, MultiDiscrete
 
@@ -27,7 +24,8 @@ from tianshou.utils.net.discrete import IntrinsicCuriosityModule
 from tianshou.utils.space_info import SpaceInfo
 from training_functions import Reward_Estimator
 
-
+TEST_TYPE='DA_test'
+LOG_DIR='log_test'
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, default="Seaquest-ram-v4")
@@ -48,8 +46,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=1024)  
     parser.add_argument("--training-num", type=int, default=10)  
     parser.add_argument("--test-num", type=int, default=2) 
-    parser.add_argument("--logdir", type=str, default="log")
-    # parser.add_argument("--logdir", type=str, default="log_test")
+    parser.add_argument("--logdir", type=str, default=LOG_DIR)
     parser.add_argument("--render", type=float, default=0.0)
     parser.add_argument(
         "--device",
@@ -94,14 +91,14 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--is_L2",
         type=bool,
-        default=True,
+        default=False,
         help="weight for the forward model loss in ICM",
     )
     parser.add_argument(
         "--data_augmentation",
         type=str,
-        default="shannon",
-        help="cutout,shannon,smooth",
+        default="translate",
+        help="cutout,shannon,smooth,scale,translate,flip",
     )
     return parser.parse_args()
 
@@ -157,7 +154,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     # log
     now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
     args.algo_name = "dqn_icm" if args.icm_lr_scale > 0 else "dqn"
-    log_name = os.path.join(args.task, 'framework_test',args.data_augmentation+' L2 '+str(args.is_L2)+now)
+    log_name = os.path.join(args.task, TEST_TYPE,args.data_augmentation+' L2 '+str(args.is_L2)+now)
     log_path = os.path.join(args.logdir, log_name)
 
     # logger
@@ -175,7 +172,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     #     config_dict=vars(args),
     # )
 
-    logger = TensorboardLogger(SummaryWriter(log_path),train_interval=10000,test_interval=10000,update_interval=10000)
+    logger = TensorboardLogger(SummaryWriter(log_path),train_interval=200000,test_interval=200000,update_interval=200000,save_interval=200000)
 
     def save_best_fn(policy: BasePolicy) -> None:
         torch.save(policy.state_dict(), os.path.join(log_path, "policy.pth"))

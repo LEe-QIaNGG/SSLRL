@@ -178,7 +178,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     #     run_id=args.resume_id,
     #     config_dict=vars(args),
     # )
-    logger = TensorboardLogger(SummaryWriter(log_path),train_interval=10000,test_interval=10000,update_interval=10000)
+    logger = TensorboardLogger(SummaryWriter(log_path),train_interval=100000,test_interval=100000,update_interval=100000,save_interval=100000)
 
     def save_best_fn(policy: BasePolicy) -> None:
         torch.save(policy.state_dict(), os.path.join(log_path, "policy.pth"))
