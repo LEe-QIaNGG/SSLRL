@@ -9,6 +9,6 @@ tensorboard --logdir=log/Seaquest-ram-v4/dqn/baseline/ --port 6006
 tensorboard --logdir=log/Seaquest-ram-v4/DA_test/ --port 6006
 tensorboard --logdir='log/Seaquest-ram-v4/L2_test/' --port 6006
 tensorboard --logdir=log/Seaquest-ram-v4/framework_test/ --port 6006
-tensorboard --logdir="log/Seaquest-ram-v4/framework_test/smooth L2 True241021-100607/" --port 6006
+tensorboard --logdir="log/Seaquest-ram-v4/framework_test/cutout L2 True241026-122235/" --port 6006
 conda env create -f tianshou_env.yaml
 conda activate tianshou_env

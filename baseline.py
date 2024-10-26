@@ -24,7 +24,7 @@ from tianshou.trainer import OffpolicyTrainer
 from tianshou.utils.net.discrete import IntrinsicCuriosityModule
 from tianshou.utils.space_info import SpaceInfo
 
-
+LOG_DIR='log_test'
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, default="Seaquest-ram-v4")
@@ -45,7 +45,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=1024)  
     parser.add_argument("--training-num", type=int, default=10)  
     parser.add_argument("--test-num", type=int, default=2)  
-    parser.add_argument("--logdir", type=str, default="log")
+    parser.add_argument("--logdir", type=str, default=LOG_DIR)
     parser.add_argument("--render", type=float, default=0.0)
     parser.add_argument(
         "--device",
@@ -87,6 +87,7 @@ def get_args() -> argparse.Namespace:
         default=0.2,
         help="weight for the forward model loss in ICM",
     )
+    parser.add_argument("--reward-distribution", type=bool, default=True)
     return parser.parse_args()
 
 
@@ -180,6 +181,17 @@ def main(args: argparse.Namespace = get_args()) -> None:
         else:
             eps = args.eps_train_final
         policy.set_eps(eps)
+        if args.reward_distribution and epoch%100==0:
+        # 保存buffer中的reward值
+            reward_distribution_path = os.path.join("log", "reward_distribution", args.task, "baseline")
+            os.makedirs(reward_distribution_path, exist_ok=True)
+            
+            # 获取buffer中的所有reward
+            rewards = buffer.get_all()["rew"]
+            
+            # 将reward保存到文件中
+            np.save(os.path.join(reward_distribution_path, f"rewards_epoch_{epoch}.npy"), rewards)
+    
         # if env_step % 1000 == 0:
         #     logger.write("train/env_step", env_step, {"train/eps": eps})
         

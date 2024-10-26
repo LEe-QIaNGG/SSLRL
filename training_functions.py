@@ -263,7 +263,7 @@ class Reward_Estimator:
         elif iter<2*num_iter/3:
             update_prob=num_real_reward/len(mask)
         else:
-            update_prob=1-alpha
+            update_prob=np.log(num_real_reward/len(mask))
         mask = torch.where(torch.rand_like(mask.float()) < update_prob, torch.zeros_like(mask,dtype=torch.bool), mask)
 
         # if iter%100 == 0:

@@ -24,8 +24,8 @@ from tianshou.utils.net.discrete import IntrinsicCuriosityModule
 from tianshou.utils.space_info import SpaceInfo
 from training_functions import Reward_Estimator
 
-TEST_TYPE='DA_test'
-LOG_DIR='log_test'
+TEST_TYPE='framework_test'
+LOG_DIR='log'
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, default="Seaquest-ram-v4")
@@ -43,7 +43,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--step-per-epoch", type=int, default=2000)
     parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
-    parser.add_argument("--batch-size", type=int, default=1024)  
+    parser.add_argument("--batch-size", type=int, default=512)  
     parser.add_argument("--training-num", type=int, default=10)  
     parser.add_argument("--test-num", type=int, default=2) 
     parser.add_argument("--logdir", type=str, default=LOG_DIR)
@@ -91,15 +91,16 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--is_L2",
         type=bool,
-        default=False,
+        default=True,
         help="weight for the forward model loss in ICM",
     )
     parser.add_argument(
         "--data_augmentation",
         type=str,
-        default="translate",
+        default="smooth",
         help="cutout,shannon,smooth,scale,translate,flip",
     )
+    parser.add_argument("--reward-distribution", type=bool, default=False)
     return parser.parse_args()
 
 
@@ -191,6 +192,22 @@ def main(args: argparse.Namespace = get_args()) -> None:
         else:
             eps = args.eps_train_final
         policy.set_eps(eps)
+        if args.reward_distribution and epoch%100==0:
+        # 保存buffer中的reward值
+            now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
+            reward_distribution_path = os.path.join("log", "reward_distribution",args.task, "L2 "+str(args.is_L2))
+            os.makedirs(reward_distribution_path, exist_ok=True)
+            rewards=buffer.rew
+            np.save(os.path.join(reward_distribution_path, f"rewards_epoch_{epoch}.npy"), rewards)
+
+        if epoch==999 and args.reward_distribution:
+            now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
+            buffer_path = os.path.join("log", "buffer", args.task, "L2 "+str(args.is_L2))
+            os.makedirs(buffer_path, exist_ok=True)
+            np.save(os.path.join(buffer_path, f"obs.npy"), buffer.obs)
+            np.save(os.path.join(buffer_path, f"action.npy"), buffer.act)
+            np.save(os.path.join(buffer_path, f"obs_next.npy"), buffer.obs_next)
+            np.save(os.path.join(buffer_path, f"reward.npy"), buffer.rew)
         # if env_step % 10000 == 0:
         #     logger.write("train/env_step", env_step, {"train/eps": eps})
         
@@ -199,7 +216,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
 
     def save_checkpoint_fn(epoch: int, env_step: int, gradient_step: int) -> str:
         # see also: https://pytorch.org/tutorials/beginner/saving_loading_models.html
-        if env_step % 100 == 0:
+        if epoch % 100 == 0:
             ckpt_path = os.path.join(log_path, f"checkpoint.pth")
             torch.save({"model": policy.state_dict()}, ckpt_path)
         return ckpt_path
