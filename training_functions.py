@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import torchvision
 from network import ResNet,FCNet
+import os   
     
 class Reward_Estimator:
     def __init__(self, obs_dim, act_dim,device,network_type='FCNet',data_augmentation=None,is_L2=False):
@@ -265,11 +266,8 @@ class Reward_Estimator:
         else:
             update_prob=np.log(num_real_reward/len(mask))
         mask = torch.where(torch.rand_like(mask.float()) < update_prob, torch.zeros_like(mask,dtype=torch.bool), mask)
+        #mask buffer_size
 
-        # if iter%100 == 0:
-        #     print("\nmask:",mask)  
-        #     print('len:',len(mask))
-        #     print('更新数量:', torch.sum(mask))
         if torch.any(mask):
             # 获取满足条件的输入数据
             masked_input = input_data[mask]
@@ -284,6 +282,39 @@ class Reward_Estimator:
             if torch.any(update_mask):
                 new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
                 buffer.rew[mask][update_mask] = new_rewards.numpy()
+                # mask[mask] = update_mask
+                # buffer.rew[mask] = new_rewards.numpy()
+                if iter%40000==0 and iter!=0:
+                    log_path = os.path.join("log", "reward_distribution",'Seaquest-ram-v4')
+                    os.makedirs(log_path, exist_ok=True)
+                    rewards_file = os.path.join(log_path, f"rewards_iter_{iter}.npy")
+                    mask_file = os.path.join(log_path, f"mask_iter_{iter}.npy")
+                    update_mask_file = os.path.join(log_path, f"update_mask_iter_{iter}.npy")
+                    new_rewards_file = os.path.join(log_path, f"new_rewards_iter_{iter}.npy")
+                    np.save(rewards_file, buffer.rew)
+                    np.save(mask_file, mask)
+                    np.save(update_mask_file, update_mask)
+                    np.save(new_rewards_file, new_rewards.numpy())
+                if iter>199990:
+                    log_path = os.path.join("log", "buffer",'Seaquest-ram-v4')
+                    os.makedirs(log_path, exist_ok=True)
+                    obs_file = os.path.join(log_path, f"obs.npy")
+                    action_file = os.path.join(log_path, f"action.npy")
+                    obs_next_file = os.path.join(log_path, f"obs_next.npy")
+                    rew_file = os.path.join(log_path, f"rew.npy")
+                    mask_file = os.path.join(log_path, f"mask.npy")
+                    update_mask_file = os.path.join(log_path, f"update_mask.npy")
+                    new_rewards_file = os.path.join(log_path, f"new_rewards.npy")
+                    np.save(obs_file, buffer.obs)
+                    np.save(action_file, buffer.act)
+                    np.save(obs_next_file, buffer.obs_next)
+                    np.save(rew_file, buffer.rew)
+                    np.save(mask_file, mask)
+                    np.save(update_mask_file, update_mask)  
+                    np.save(new_rewards_file, new_rewards.numpy())
+                    
+
+
         
     def update(self, batch, buffer, alpha, iter):
         update_flag = False

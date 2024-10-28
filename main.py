@@ -25,10 +25,10 @@ from tianshou.utils.space_info import SpaceInfo
 from training_functions import Reward_Estimator
 
 TEST_TYPE='DA_test'
-LOG_DIR='log'
+LOG_DIR='log_test'
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", type=str, default="Seaquest-ram-v4")
+    parser.add_argument("--task", type=str, default="Hero-ram-v4")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--scale-obs", type=int, default=0)
     parser.add_argument("--eps-test", type=float, default=0.005)
@@ -43,7 +43,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--step-per-epoch", type=int, default=2000)
     parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
-    parser.add_argument("--batch-size", type=int, default=512)  
+    parser.add_argument("--batch-size", type=int, default=256)  
     parser.add_argument("--training-num", type=int, default=10)  
     parser.add_argument("--test-num", type=int, default=2) 
     parser.add_argument("--logdir", type=str, default=LOG_DIR)
@@ -97,10 +97,9 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--data_augmentation",
         type=str,
-        default="translate",
+        default="shannon",
         help="cutout,shannon,smooth,scale,translate,flip",
     )
-    parser.add_argument("--reward-distribution", type=bool, default=False)
     return parser.parse_args()
 
 
@@ -139,14 +138,10 @@ def main(args: argparse.Namespace = get_args()) -> None:
     if args.resume_path:
         policy.load_state_dict(torch.load(args.resume_path, map_location=args.device))
         print("Loaded agent from: ", args.resume_path)
-    # replay buffer: `save_last_obs` and `stack_num` can be removed together
-    # when you have enough RAM
+
     buffer = VectorReplayBuffer(
         args.buffer_size,
         buffer_num=args.training_num,
-        # ignore_obs_next=True,
-        # save_only_last_obs=True,
-        # stack_num=args.frames_stack,
     )
     # collector
     train_collector = Collector[CollectStats](policy, train_envs, buffer, exploration_noise=True)
@@ -158,20 +153,6 @@ def main(args: argparse.Namespace = get_args()) -> None:
     log_name = os.path.join(args.task, TEST_TYPE,args.data_augmentation+' L2 '+str(args.is_L2)+now)
     log_path = os.path.join(args.logdir, log_name)
 
-    # logger
-    # logger_factory = LoggerFactoryDefault()
-    # if args.logger == "wandb":
-    #     logger_factory.logger_type = "wandb"
-    #     logger_factory.wandb_project = args.wandb_project
-    # else:
-    #     logger_factory.logger_type = "tensorboard"
-
-    # logger = logger_factory.create_logger(
-    #     log_dir=log_path,
-    #     experiment_name=log_name,
-    #     run_id=args.resume_id,
-    #     config_dict=vars(args),
-    # )
 
     logger = TensorboardLogger(SummaryWriter(log_path),train_interval=200000,test_interval=200000,update_interval=200000,save_interval=200000)
 
@@ -192,34 +173,12 @@ def main(args: argparse.Namespace = get_args()) -> None:
         else:
             eps = args.eps_train_final
         policy.set_eps(eps)
-        if args.reward_distribution and epoch%200==0:
-        # 保存buffer中的reward值
-            now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
-            reward_distribution_path = os.path.join("log", "reward_distribution",args.task, "L2 "+str(args.is_L2))
-            os.makedirs(reward_distribution_path, exist_ok=True)
-            rewards=buffer.rew
-            file_path = os.path.join(reward_distribution_path, f"rewards_epoch_{epoch}.npy")
-            if os.path.exists(file_path):
-                existing_rewards = np.load(file_path)
-                rewards = np.concatenate((existing_rewards, rewards))
-            np.save(file_path, rewards)
 
-        if epoch==999 and args.reward_distribution:
-            now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
-            buffer_path = os.path.join("log", "buffer", args.task, "L2 "+str(args.is_L2))
-            os.makedirs(buffer_path, exist_ok=True)
-            np.save(os.path.join(buffer_path, f"obs.npy"), buffer.obs)
-            np.save(os.path.join(buffer_path, f"action.npy"), buffer.act)
-            np.save(os.path.join(buffer_path, f"obs_next.npy"), buffer.obs_next)
-            np.save(os.path.join(buffer_path, f"reward.npy"), buffer.rew)
-        # if env_step % 10000 == 0:
-        #     logger.write("train/env_step", env_step, {"train/eps": eps})
         
     def test_fn(epoch: int, env_step: int | None) -> None:
         policy.set_eps(args.eps_test)
 
     def save_checkpoint_fn(epoch: int, env_step: int, gradient_step: int) -> str:
-        # see also: https://pytorch.org/tutorials/beginner/saving_loading_models.html
         if epoch % 100 == 0:
             ckpt_path = os.path.join(log_path, f"checkpoint.pth")
             torch.save({"model": policy.state_dict()}, ckpt_path)

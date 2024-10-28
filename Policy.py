@@ -5,6 +5,8 @@ from typing import Any, Generic, Literal, Self, TypeVar, cast
 import gymnasium as gym
 import numpy as np
 import torch
+import os
+import copy
 
 from tianshou.data import Batch, ReplayBuffer, to_numpy, to_torch_as
 from tianshou.data.batch import BatchProtocol
@@ -274,4 +276,5 @@ class DQNPolicy(BasePolicy[TDQNTrainingStats], Generic[TDQNTrainingStats]):
         else:
             alpha = 0.5
             self.reward_estimator.update(batch,buffer, alpha,self._iter)
-            print('iter:',self._iter)
+
+    
