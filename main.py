@@ -97,7 +97,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--data_augmentation",
         type=str,
-        default="scale",
+        default="translate",
         help="cutout,shannon,smooth,scale,translate,flip",
     )
     parser.add_argument("--reward-distribution", type=bool, default=False)
@@ -192,13 +192,17 @@ def main(args: argparse.Namespace = get_args()) -> None:
         else:
             eps = args.eps_train_final
         policy.set_eps(eps)
-        if args.reward_distribution and epoch%100==0:
+        if args.reward_distribution and epoch%200==0:
         # 保存buffer中的reward值
             now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
             reward_distribution_path = os.path.join("log", "reward_distribution",args.task, "L2 "+str(args.is_L2))
             os.makedirs(reward_distribution_path, exist_ok=True)
             rewards=buffer.rew
-            np.save(os.path.join(reward_distribution_path, f"rewards_epoch_{epoch}.npy"), rewards)
+            file_path = os.path.join(reward_distribution_path, f"rewards_epoch_{epoch}.npy")
+            if os.path.exists(file_path):
+                existing_rewards = np.load(file_path)
+                rewards = np.concatenate((existing_rewards, rewards))
+            np.save(file_path, rewards)
 
         if epoch==999 and args.reward_distribution:
             now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
