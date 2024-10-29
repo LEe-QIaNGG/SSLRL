@@ -27,7 +27,7 @@ from tianshou.utils.space_info import SpaceInfo
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", type=str, default="Seaquest-ram-v4")
+    parser.add_argument("--task", type=str, default="Hero-ram-v4")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--scale-obs", type=int, default=0)
     parser.add_argument("--eps-test", type=float, default=0.005)
@@ -42,7 +42,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--step-per-epoch", type=int, default=2000)
     parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
-    parser.add_argument("--batch-size", type=int, default=1024)  
+    parser.add_argument("--batch-size", type=int, default=256)  
     parser.add_argument("--training-num", type=int, default=10)  
     parser.add_argument("--test-num", type=int, default=2)  
     parser.add_argument("--logdir", type=str, default="log")
@@ -145,14 +145,11 @@ def main(args: argparse.Namespace = get_args()) -> None:
     if args.resume_path:
         policy.load_state_dict(torch.load(args.resume_path, map_location=args.device))
         print("Loaded agent from: ", args.resume_path)
-    # replay buffer: `save_last_obs` and `stack_num` can be removed together
-    # when you have enough RAM
+
     buffer = VectorReplayBuffer(
         args.buffer_size,
         buffer_num=args.training_num,
         ignore_obs_next=True,
-        # save_only_last_obs=True,
-        # stack_num=args.frames_stack,
     )
     # collector
     train_collector = Collector[CollectStats](policy, train_envs, buffer, exploration_noise=True)
@@ -164,21 +161,8 @@ def main(args: argparse.Namespace = get_args()) -> None:
     log_name = os.path.join(args.task, 'framework_test', 'ICM_'+ now)
     log_path = os.path.join(args.logdir, log_name)
 
-    # logger
-    # logger_factory = LoggerFactoryDefault()
-    # if args.logger == "wandb":
-    #     logger_factory.logger_type = "wandb"
-    #     logger_factory.wandb_project = args.wandb_project
-    # else:
-    #     logger_factory.logger_type = "tensorboard"
 
-    # logger = logger_factory.create_logger(
-    #     log_dir=log_path,
-    #     experiment_name=log_name,
-    #     run_id=args.resume_id,
-    #     config_dict=vars(args),
-    # )
-    logger = TensorboardLogger(SummaryWriter(log_path),train_interval=100000,test_interval=100000,update_interval=100000,save_interval=100000)
+    logger = TensorboardLogger(SummaryWriter(log_path),train_interval=200000,test_interval=200000,update_interval=200000,save_interval=200000)
 
     def save_best_fn(policy: BasePolicy) -> None:
         torch.save(policy.state_dict(), os.path.join(log_path, "policy.pth"))
