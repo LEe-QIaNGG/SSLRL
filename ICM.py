@@ -165,7 +165,8 @@ def main(args: argparse.Namespace = get_args()) -> None:
     logger = TensorboardLogger(SummaryWriter(log_path),train_interval=200000,test_interval=200000,update_interval=200000,save_interval=200000)
 
     def save_best_fn(policy: BasePolicy) -> None:
-        torch.save(policy.state_dict(), os.path.join(log_path, "policy.pth"))
+        # torch.save(policy.state_dict(), os.path.join(log_path, "policy.pth"))
+        pass   
 
     def stop_fn(mean_rewards: float) -> bool:
         if env.spec.reward_threshold:
@@ -188,10 +189,10 @@ def main(args: argparse.Namespace = get_args()) -> None:
         policy.set_eps(args.eps_test)
 
     def save_checkpoint_fn(epoch: int, env_step: int, gradient_step: int) -> str:
-        # see also: https://pytorch.org/tutorials/beginner/saving_loading_models.html
-        ckpt_path = os.path.join(log_path, f"checkpoint.pth")
-        torch.save({"model": policy.state_dict()}, ckpt_path)
-        return ckpt_path
+        # ckpt_path = os.path.join(log_path, f"checkpoint.pth")
+        # torch.save({"model": policy.state_dict()}, ckpt_path)
+        # return ckpt_path
+        pass
 
     # watch agent's performance
     def watch() -> None:

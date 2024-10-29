@@ -24,8 +24,8 @@ from tianshou.utils.net.discrete import IntrinsicCuriosityModule
 from tianshou.utils.space_info import SpaceInfo
 from training_functions import Reward_Estimator
 
-TEST_TYPE='DA_test'
-LOG_DIR='log_test'
+TEST_TYPE='framework_test'
+LOG_DIR='log'
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, default="Hero-ram-v4")
@@ -91,13 +91,13 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--is_L2",
         type=bool,
-        default=False,
+        default=True,
         help="weight for the forward model loss in ICM",
     )
     parser.add_argument(
         "--data_augmentation",
         type=str,
-        default="shannon",
+        default="smooth",
         help="cutout,shannon,smooth,scale,translate,flip",
     )
     return parser.parse_args()
@@ -157,7 +157,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     logger = TensorboardLogger(SummaryWriter(log_path),train_interval=200000,test_interval=200000,update_interval=200000,save_interval=200000)
 
     def save_best_fn(policy: BasePolicy) -> None:
-        torch.save(policy.state_dict(), os.path.join(log_path, "policy.pth"))
+        pass
 
     def stop_fn(mean_rewards: float) -> bool:
         if env.spec.reward_threshold:
@@ -179,10 +179,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
         policy.set_eps(args.eps_test)
 
     def save_checkpoint_fn(epoch: int, env_step: int, gradient_step: int) -> str:
-        if epoch % 100 == 0:
-            ckpt_path = os.path.join(log_path, f"checkpoint.pth")
-            torch.save({"model": policy.state_dict()}, ckpt_path)
-        return ckpt_path
+        pass
 
     # watch agent's performance
     def watch() -> None:
