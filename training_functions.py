@@ -13,7 +13,7 @@ class Reward_Estimator:
         '''
         self.obs_dim = obs_dim
         self.act_dim = act_dim
-        self.num_reward = 10
+        self.num_reward = 12
         if network_type == 'ResNet':
             self.Qnet = ResNet(obs_dim+act_dim, self.num_reward).to(device)
             self.Vnet = ResNet(obs_dim, self.num_reward ).to(device)
@@ -23,7 +23,7 @@ class Reward_Estimator:
         self.optim_Q= torch.optim.Adam(self.Qnet.parameters(), lr=1e-3)
         self.optim_V= torch.optim.Adam(self.Vnet.parameters(), lr=1e-3)
         self.reward_list = [0] * self.num_reward
-        self.true_reward=[]
+        self.true_reward=[0]
         self.threshold=0.7
         self.device=device
         self.data_augmentation=data_augmentation
@@ -228,21 +228,22 @@ class Reward_Estimator:
 
     def update_true_reward(self, reward):
         non_zero_rewards = reward[reward != 0]
-        if len(non_zero_rewards) == 0:
+        if len(non_zero_rewards) == 0 or len(self.true_reward) >= self.num_reward:
             return
-        old_min = min(self.true_reward) if self.true_reward else float('inf')
-        old_max = max(self.true_reward) if self.true_reward else float('-inf')
-        
+        update_flag=False
         for r in non_zero_rewards:
             if r.item() not in self.true_reward:
                 self.true_reward.append(r.item())
+                update_flag=True
         
-        new_min = min(self.true_reward)
-        new_max = max(self.true_reward)
-        
-        if new_min != old_min or new_max != old_max:
-            min_value = min(new_min, 0)
-            self.reward_list = np.linspace(min_value, new_max-1, self.num_reward).tolist()
+        if update_flag:
+            if len(self.true_reward) > 0:
+                x = np.arange(len(self.true_reward))
+                y = np.array(self.true_reward)
+                f = np.interp(np.linspace(0, len(self.true_reward) - 1, self.num_reward), x, y)
+                self.true_reward = sorted(self.true_reward)
+                f = np.sort(f)
+                self.reward_list = f.tolist()
             print('\nreward list:', self.reward_list)
             print('\ntrue reward:', self.true_reward)
 
@@ -264,7 +265,7 @@ class Reward_Estimator:
         elif iter<2*num_iter/3:
             update_prob=num_real_reward/len(mask)
         else:
-            update_prob=np.log(num_real_reward/len(mask))
+            update_prob=np.sqrt(num_real_reward/len(mask))
         mask = torch.where(torch.rand_like(mask.float()) < update_prob, torch.zeros_like(mask,dtype=torch.bool), mask)
         #mask buffer_size
 
