@@ -3,11 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-npy_files = sorted([f for f in os.listdir('/home/yangyangjun/lwy/SSLRL/draw/draw_source/reward_distribution/Hero-ram-v4/baseline') if f.endswith('.npy')])
+source_path = 'draw/draw_source/reward_distribution/Hero-ram-v4/L2true1/'
+npy_files = sorted([f for f in os.listdir(source_path) if f.endswith('.npy')])
 
 # 读取每个 .npy 文件的 reward 数据
 # 修改为使用完整路径加载文件
-rewards_per_epoch = [np.load(os.path.join('/home/yangyangjun/lwy/SSLRL/draw/draw_source/reward_distribution/Hero-ram-v4/baseline', f)) for f in npy_files]
+rewards_per_epoch = [np.load(os.path.join(source_path, f)) for f in npy_files]
 reward_counts_per_epoch = [np.unique(reward, return_counts=True) for reward in rewards_per_epoch]
 
 def smooth_frequency(frequency, factor=0.5):
@@ -47,6 +48,6 @@ ax.set_zlabel("Normalized Frequency")
 ax.set_title("3D Distribution of Rewards Over Epochs")
 ax.legend()
 
-plt.savefig('draw/reward_distribution_3d.png')
+plt.savefig(source_path+'reward_distribution_3d.png')
 
 

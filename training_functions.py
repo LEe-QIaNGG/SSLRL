@@ -28,6 +28,7 @@ class Reward_Estimator:
         self.device=device
         self.data_augmentation=data_augmentation
         self.is_L2=is_L2
+        self.is_store=False
 
     def get_input_data(self, buffer, mask_nonzero):
         obs = torch.tensor(buffer.obs[mask_nonzero], device=self.device)
@@ -176,9 +177,9 @@ class Reward_Estimator:
         return torch.cat([smoothed_data, action], dim=-1)
     
     def calculate_mask(self, buffer):
-        # 使用numpy的isin函数来创建掩码
-        # ~操作符用于取反，因为我们要找的是不在true_reward中的项
-        return ~np.isin(buffer.rew, self.true_reward)
+        buffer_rew=buffer.rew
+        reward_list=np.array(self.true_reward[self.true_reward != 0])
+        return ~np.isin(buffer_rew, reward_list)
 
     def update_network(self, buffer, alpha):
         is_L2=self.is_L2
@@ -256,16 +257,17 @@ class Reward_Estimator:
         
         # 对于buffer中reward不等于true_reward里的值的项
         mask = self.calculate_mask(buffer)
+
         # if iter%100 == 0:
         #     print('真实reward的数量:', np.sum(~mask))
         num_real_reward=np.sum(~mask)
         mask = torch.from_numpy(mask)
         if iter<num_iter/3:
-            update_prob=np.sqrt(num_real_reward/len(mask))
+            update_prob=(num_real_reward/len(mask))**2
         elif iter<2*num_iter/3:
             update_prob=num_real_reward/len(mask)
         else:
-            update_prob=np.sqrt(num_real_reward/len(mask))
+            update_prob=(num_real_reward/len(mask))**3
         mask = torch.where(torch.rand_like(mask.float()) < update_prob, torch.zeros_like(mask,dtype=torch.bool), mask)
         #mask buffer_size
 
@@ -284,34 +286,34 @@ class Reward_Estimator:
                 new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
                 buffer.rew[mask][update_mask] = new_rewards.numpy()
 
-                # if iter%40000==0 and iter!=0:
-                #     log_path = os.path.join("log", "reward_distribution",'Hero-ram-v4')
-                #     os.makedirs(log_path, exist_ok=True)
-                #     rewards_file = os.path.join(log_path, f"rewards_iter_{iter}.npy")
-                #     mask_file = os.path.join(log_path, f"mask_iter_{iter}.npy")
-                #     update_mask_file = os.path.join(log_path, f"update_mask_iter_{iter}.npy")
-                #     new_rewards_file = os.path.join(log_path, f"new_rewards_iter_{iter}.npy")
-                #     np.save(rewards_file, buffer.rew)
-                #     np.save(mask_file, mask)
-                #     np.save(update_mask_file, update_mask)
-                #     np.save(new_rewards_file, new_rewards.numpy())
-                # if iter>199990:
-                #     log_path = os.path.join("log", "buffer",'Hero-ram-v4')
-                #     os.makedirs(log_path, exist_ok=True)
-                #     obs_file = os.path.join(log_path, f"obs.npy")
-                #     action_file = os.path.join(log_path, f"action.npy")
-                #     obs_next_file = os.path.join(log_path, f"obs_next.npy")
-                #     rew_file = os.path.join(log_path, f"rew.npy")
-                #     mask_file = os.path.join(log_path, f"mask.npy")
-                #     update_mask_file = os.path.join(log_path, f"update_mask.npy")
-                #     new_rewards_file = os.path.join(log_path, f"new_rewards.npy")
-                #     np.save(obs_file, buffer.obs)
-                #     np.save(action_file, buffer.act)
-                #     np.save(obs_next_file, buffer.obs_next)
-                #     np.save(rew_file, buffer.rew)
-                #     np.save(mask_file, mask)
-                #     np.save(update_mask_file, update_mask)  
-                #     np.save(new_rewards_file, new_rewards.numpy())
+                if iter%40000==0 and iter!=0 and self.is_store:
+                    log_path = os.path.join("log", "reward_distribution",'Hero-ram-v4'+self.is_L2)
+                    os.makedirs(log_path, exist_ok=True)
+                    rewards_file = os.path.join(log_path, f"rewards_iter_{iter}.npy")
+                    mask_file = os.path.join(log_path, f"mask_iter_{iter}.npy")
+                    update_mask_file = os.path.join(log_path, f"update_mask_iter_{iter}.npy")
+                    new_rewards_file = os.path.join(log_path, f"new_rewards_iter_{iter}.npy")
+                    np.save(rewards_file, buffer.rew)
+                    np.save(mask_file, mask)
+                    np.save(update_mask_file, update_mask)
+                    np.save(new_rewards_file, new_rewards.numpy())
+                if iter>199990 and self.is_store:
+                    log_path = os.path.join("log", "buffer",'Hero-ram-v4'+self.is_L2)
+                    os.makedirs(log_path, exist_ok=True)
+                    obs_file = os.path.join(log_path, f"obs.npy")
+                    action_file = os.path.join(log_path, f"action.npy")
+                    obs_next_file = os.path.join(log_path, f"obs_next.npy")
+                    rew_file = os.path.join(log_path, f"rew.npy")
+                    mask_file = os.path.join(log_path, f"mask.npy")
+                    update_mask_file = os.path.join(log_path, f"update_mask.npy")
+                    new_rewards_file = os.path.join(log_path, f"new_rewards.npy")
+                    np.save(obs_file, buffer.obs)
+                    np.save(action_file, buffer.act)
+                    np.save(obs_next_file, buffer.obs_next)
+                    np.save(rew_file, buffer.rew)
+                    np.save(mask_file, mask)
+                    np.save(update_mask_file, update_mask)  
+                    np.save(new_rewards_file, new_rewards.numpy())
                     
 
 
