@@ -28,7 +28,7 @@ class Reward_Estimator:
         self.device=device
         self.data_augmentation=data_augmentation
         self.is_L2=is_L2
-        self.is_store=False
+        self.is_store=True
 
     def get_input_data(self, buffer, mask_nonzero):
         obs = torch.tensor(buffer.obs[mask_nonzero], device=self.device)
@@ -177,9 +177,8 @@ class Reward_Estimator:
         return torch.cat([smoothed_data, action], dim=-1)
     
     def calculate_mask(self, buffer):
-        buffer_rew=buffer.rew
         reward_list=np.array(self.true_reward[self.true_reward != 0])
-        return ~np.isin(buffer_rew, reward_list)
+        return ~np.isin(buffer.rew, reward_list)
 
     def update_network(self, buffer, alpha):
         is_L2=self.is_L2
@@ -287,7 +286,7 @@ class Reward_Estimator:
                 buffer.rew[mask][update_mask] = new_rewards.numpy()
 
                 if iter%40000==0 and iter!=0 and self.is_store:
-                    log_path = os.path.join("log", "reward_distribution",'Hero-ram-v4'+self.is_L2)
+                    log_path = os.path.join("log", "reward_distribution",'Hero-ram-v4'+str(self.is_L2))
                     os.makedirs(log_path, exist_ok=True)
                     rewards_file = os.path.join(log_path, f"rewards_iter_{iter}.npy")
                     mask_file = os.path.join(log_path, f"mask_iter_{iter}.npy")
@@ -298,7 +297,7 @@ class Reward_Estimator:
                     np.save(update_mask_file, update_mask)
                     np.save(new_rewards_file, new_rewards.numpy())
                 if iter>199990 and self.is_store:
-                    log_path = os.path.join("log", "buffer",'Hero-ram-v4'+self.is_L2)
+                    log_path = os.path.join("log", "buffer",'Hero-ram-v4'+str(self.is_L2))
                     os.makedirs(log_path, exist_ok=True)
                     obs_file = os.path.join(log_path, f"obs.npy")
                     action_file = os.path.join(log_path, f"action.npy")
