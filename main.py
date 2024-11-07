@@ -22,7 +22,7 @@ from tianshou.trainer import OffpolicyTrainer
 from tianshou.utils.space_info import SpaceInfo
 from training_functions import Reward_Estimator
 
-TEST_TYPE='framework_test'
+TEST_TYPE='DA_test'
 LOG_DIR='log'
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -89,7 +89,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--is_L2",
         type=bool,
-        default=True,
+        default=False,
         help="weight for the forward model loss in ICM",
     )
     parser.add_argument(
