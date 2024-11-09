@@ -23,7 +23,7 @@ from tianshou.utils.space_info import SpaceInfo
 from training_functions import Reward_Estimator
 
 TEST_TYPE='DA_test'
-LOG_DIR='log'
+LOG_DIR='log_test'
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, default="Hero-ram-v4")

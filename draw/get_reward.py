@@ -11,4 +11,4 @@ for i in range(1,6):
     print(np.unique(reward[reward != 0]))
     reward[mask] = new_rewards
     print(np.unique(reward[reward != 0]))
-    np.save(target_path+'reward_{}.npy'.format(iter//200),reward)
+    # np.save(target_path+'reward_{}.npy'.format(iter//200),reward)
