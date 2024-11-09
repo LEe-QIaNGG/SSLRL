@@ -9,8 +9,8 @@ from sklearn.mixture import GaussianMixture
 from sklearn.datasets import make_blobs
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
-source_path = 'draw/draw_source/cluster/Hero-ram-v41/'
-target_path = 'draw/result/cluster/'
+source_path = 'log/buffer/Hero-ram-v4False/'
+target_path = 'draw/result/cluster/Hero-ram-v4False/'
 action=np.load(source_path+'action.npy')
 obs=np.load(source_path+'obs.npy')
 obs_next=np.load(source_path+'obs_next.npy')

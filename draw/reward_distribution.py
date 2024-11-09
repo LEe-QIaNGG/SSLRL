@@ -1,9 +1,11 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
+from scipy.interpolate import make_interp_spline
 from mpl_toolkits.mplot3d import Axes3D
 
-source_path = 'draw/draw_source/reward_distribution/Hero-ram-v4/L2true1/'
+source_path = 'draw/draw_source/reward_distribution/Hero-ram-v4/L2False/'
 npy_files = sorted([f for f in os.listdir(source_path) if f.endswith('.npy')])
 
 # 读取每个 .npy 文件的 reward 数据
@@ -14,10 +16,7 @@ reward_counts_per_epoch = [np.unique(reward, return_counts=True) for reward in r
 def smooth_frequency(frequency, factor=0.5):
     return frequency ** factor  # 平方根缩放，将 factor 设为 0.5
 
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.stats import gaussian_kde
-from scipy.interpolate import make_interp_spline
+
 
 
 # reward_counts_per_epoch[0][1][0] = np.sqrt(reward_counts_per_epoch[0][1][0])
@@ -38,7 +37,7 @@ for i, (rewards, counts) in enumerate(reward_counts_per_epoch):
 
     # 绘制 3D 曲线
     ax.bar3d(rewards, y_values, np.zeros_like(counts_normalized), 
-             dx=0.1, dy=0.1, dz=counts_normalized,  # 添加 dx, dy, dz 参数
+             dx=20, dy=0.01, dz=counts_normalized,  # 添加 dx, dy, dz 参数
              label=f"Epoch {(i+1)*200}", alpha=0.5)
 
 # 添加标签和标题
