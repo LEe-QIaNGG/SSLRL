@@ -28,7 +28,7 @@ class Reward_Estimator:
         self.device=device
         self.data_augmentation=data_augmentation
         self.is_L2=is_L2
-        self.is_store=True
+        self.is_store=False
 
     def get_input_data(self, buffer, mask_nonzero):
         obs = torch.tensor(buffer.obs[mask_nonzero], device=self.device)

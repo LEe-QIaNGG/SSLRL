@@ -1,6 +1,6 @@
 import numpy as np
-source_path = 'log/reward_distribution/Hero-ram-v4False/'
-target_path='draw/draw_source/reward_distribution/Hero-ram-v4/L2False/'
+source_path = '../log/reward_distribution/Hero-ram-v41/'
+target_path='../draw/draw_source/reward_distribution/Hero-ram-v4/L2False/'
 for i in range(1,6):
     iter=i*40000
     mask=np.load(source_path+'mask_iter_{}.npy'.format(iter))
