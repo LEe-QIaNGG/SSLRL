@@ -22,11 +22,11 @@ from tianshou.trainer import OffpolicyTrainer
 from tianshou.utils.space_info import SpaceInfo
 from training_functions import Reward_Estimator
 
-TEST_TYPE='DA_test'
-LOG_DIR='log_test'
+TEST_TYPE='framework_test'
+LOG_DIR='log'
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", type=str, default="Hero-ram-v4")
+    parser.add_argument("--task", type=str, default="MontezumaRevenge-ram-v4")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--scale-obs", type=int, default=0)
     parser.add_argument("--eps-test", type=float, default=0.005)
@@ -89,7 +89,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--is_L2",
         type=bool,
-        default=False,
+        default=True,
         help="weight for the forward model loss in ICM",
     )
     parser.add_argument(

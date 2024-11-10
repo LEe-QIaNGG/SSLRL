@@ -12,3 +12,4 @@ tensorboard --logdir=log/Hero-ram-v4/DA_test/ --port 6006
 tensorboard --logdir="log/Hero-ram-v4/framework_test/" --port 6006
 conda env create -f tianshou_env.yaml
 conda activate tianshou_env
+gpu-interactive
