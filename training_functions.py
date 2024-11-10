@@ -28,7 +28,7 @@ class Reward_Estimator:
         self.device=device
         self.data_augmentation=data_augmentation
         self.is_L2=is_L2
-        self.is_store=True
+        self.is_store=False
 
     def get_input_data(self, buffer, mask_nonzero):
         obs = torch.tensor(buffer.obs[mask_nonzero], device=self.device)
@@ -262,12 +262,12 @@ class Reward_Estimator:
         num_real_reward=np.sum(~mask)
         mask = torch.from_numpy(mask)
         if iter<num_iter/3:
-            update_prob=(num_real_reward/len(mask))**2
+            update_prob=min(num_real_reward/len(mask),0.005)
         elif iter<2*num_iter/3:
-            update_prob=num_real_reward/len(mask)
+            update_prob=min(num_real_reward/len(mask),0.05)
         else:
-            update_prob=(num_real_reward/len(mask))**3
-        mask = torch.where(torch.rand_like(mask.float()) < update_prob, torch.zeros_like(mask,dtype=torch.bool), mask)
+            update_prob=min(num_real_reward/len(mask),0.01)
+        mask = torch.where(torch.rand_like(mask.float()) < update_prob, mask, torch.zeros_like(mask,dtype=torch.bool))
         #mask buffer_size
 
         if torch.any(mask):

@@ -1,5 +1,6 @@
 import numpy as np
-source_path = 'draw/draw_source/reward_distribution/Hero-ram-v4/L2true1/'
+source_path = '../log/reward_distribution/Hero-ram-v41/'
+target_path='../draw/draw_source/reward_distribution/Hero-ram-v4/L2False/'
 for i in range(1,6):
     iter=i*40000
     mask=np.load(source_path+'mask_iter_{}.npy'.format(iter))
@@ -10,4 +11,4 @@ for i in range(1,6):
     print(np.unique(reward[reward != 0]))
     reward[mask] = new_rewards
     print(np.unique(reward[reward != 0]))
-    np.save(source_path+'reward_{}.npy'.format(iter//200),reward)
+    # np.save(target_path+'reward_{}.npy'.format(iter//200),reward)
