@@ -3,15 +3,34 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from glob import glob
-
+import pandas as pd
 # 定义颜色列表
 colors = ['blue', 'red', 'green', 'orange', 'purple']
+Type='framework'
+task='Hero'
 
 # 定义源目录
 source_dir = "draw/draw_source/framework/Seaquest/"
 
 # 查找所有的 events 文件
 event_files = glob(os.path.join(source_dir, "**/events.out.tfevents.*"), recursive=True)
+
+# 在文件开头定义颜色映射字典
+color_mapping = {
+    'translate': 'blue',
+    'flip': 'red',
+    'shannon': 'green',
+    'scale': 'orange',
+    'baseline': 'red',
+    'ICM': 'blue',
+    'cutout': 'orange',
+    'smooth':'magenta'
+}
+label_mapping = {
+    'cutout': 'SSLRS-C',
+    'smooth': 'SSLRS-M',
+    'shannon': 'SSLRS-S',
+}
 
 plt.figure(figsize=(12, 8))
 
@@ -34,16 +53,19 @@ for i, event_file in enumerate(event_files):
 
     # 绘制线条和浅色区域
     folder_name = os.path.basename(os.path.dirname(event_file))
-    color = colors[i % len(colors)]
-    
-    import pandas as pd
+    algorithm_name = folder_name.split(' L2')[0]
+    color = color_mapping.get(algorithm_name, colors[i % len(colors)])  # 如果找不到映射就使用默认颜色
 
     # 将数据转为 pandas.Series 对象，方便处理
     rewards_series = pd.Series(best_rewards)
     smoothed_rewards = rewards_series.rolling(window=window_size, min_periods=1, center=False).mean().to_numpy()
 
     # 绘制完整数据的平滑曲线
-    plt.plot(steps, smoothed_rewards, label=folder_name.split('24')[0], color=color)
+    if Type == 'framework':
+        label = label_mapping.get(algorithm_name, algorithm_name)
+    else:
+        label = algorithm_name
+    plt.plot(steps, smoothed_rewards, label=label, color=color)
     plt.fill_between(steps, 
                     smoothed_rewards - np.array(best_reward_stds), 
                     smoothed_rewards + np.array(best_reward_stds), 
@@ -51,13 +73,13 @@ for i, event_file in enumerate(event_files):
 
 
 plt.xlabel('episode')
-plt.ylabel('Seaquest-ram-v4')
-plt.title('best reward of different training configurations')
+plt.ylabel('best reward')
+plt.title(task)
 plt.legend()
 plt.grid(True)
 
 # 保存图片
-plt.savefig('draw/best_reward.png')
+plt.savefig(f'draw/result/score/{Type}_{task}_best_reward.png')
 plt.close()
 
-print("图像已保存为 best_reward.png")
+print(f"图像已保存为 {Type}_{task}_best_reward.png")
