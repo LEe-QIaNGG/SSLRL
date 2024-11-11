@@ -95,7 +95,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--data_augmentation",
         type=str,
-        default="shannon",
+        default="smooth",
         help="cutout,shannon,smooth,scale,translate,flip",
     )
     return parser.parse_args()
