@@ -261,12 +261,15 @@ class Reward_Estimator:
         #     print('真实reward的数量:', np.sum(~mask))
         num_real_reward=np.sum(~mask)
         mask = torch.from_numpy(mask)
-        if iter<num_iter/3:
-            update_prob=min(num_real_reward/len(mask),0.005)
-        elif iter<2*num_iter/3:
-            update_prob=min(num_real_reward/len(mask),0.05)
+        if num_real_reward<10:
+            update_prob=0.002
         else:
-            update_prob=min(num_real_reward/len(mask),0.01)
+            if iter<num_iter/3:
+                update_prob=min(num_real_reward/len(mask),0.005)
+            elif iter<2*num_iter/3:
+                update_prob=min(num_real_reward/len(mask),0.05)
+            else:
+                update_prob=min(num_real_reward/len(mask),0.01)
         mask = torch.where(torch.rand_like(mask.float()) < update_prob, mask, torch.zeros_like(mask,dtype=torch.bool))
         #mask buffer_size
 
@@ -281,8 +284,16 @@ class Reward_Estimator:
                 
             # 更新满足条件的奖励
             update_mask = max_confidence > self.threshold
-            if torch.any(update_mask):
+            if sum(update_mask)>1:
                 new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
+                # # 使用 mask 筛选 buffer.rew 中的元素
+                # selected_rewards = buffer.rew[mask]
+
+                # # 使用 update_mask 进一步筛选
+                # selected_rewards[update_mask] = new_rewards.numpy()
+
+                # # 更新 buffer 中的值
+                # buffer.rew[mask] = selected_rewards
                 buffer.rew[mask][update_mask] = new_rewards.numpy()
 
                 if iter%40000==0 and iter!=0 and self.is_store:
