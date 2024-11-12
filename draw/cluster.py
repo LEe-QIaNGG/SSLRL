@@ -1,16 +1,13 @@
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
-from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score, silhouette_score
-from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.mixture import GaussianMixture
-from sklearn.datasets import make_blobs
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.preprocessing import StandardScaler
 
-source_path = 'log/buffer/Hero-ram-v4False/'
-target_path = 'draw/result/cluster/Hero-ram-v4False/'
+source_path = 'log/buffer/Hero-ram-v4True/'
+target_path = 'draw/result/cluster/Hero-ram-v4True/'
 action=np.load(source_path+'action.npy')
 obs=np.load(source_path+'obs.npy')
 obs_next=np.load(source_path+'obs_next.npy')
