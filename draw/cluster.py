@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
+import matplotlib.ticker as ticker
 
 source_path = 'log/buffer/Hero-ram-v4True/'
 target_path = 'draw/result/cluster/Hero-ram-v4True/'
@@ -70,12 +71,13 @@ sample_labels = []
 draw_labels = []
 for label in np.unique(reward_labels):
     class_data = data[reward_labels == label]
-    sample_size = min(class_data.shape[0],200)
+    sample_size = min(class_data.shape[0],20)
     sampled = class_data[np.random.choice(class_data.shape[0], sample_size, replace=False)]
     sample_data.append(sampled)
     sample_labels.extend([label] * sample_size)
     # 只在每个类别的第一个样本显示标签,其余为null
     draw_labels.append([int(reverse_labels[label])] + [None] * (sample_size-1))
+    # draw_labels.append([int(reverse_labels[label])] * sample_size)
 sample_data = np.vstack(sample_data)  # 合并所有采样的数据
 sample_labels = np.array(sample_labels)  # 转换为数组
 draw_labels = np.hstack(draw_labels)
@@ -88,6 +90,15 @@ consensus = consensus_matrix(sample_data, num_clusters=centers, num_iterations=n
 plt.figure(figsize=(8, 6))
 sns.heatmap(consensus, cmap="viridis", square=True, cbar=True, 
             xticklabels=draw_labels, yticklabels=draw_labels)
+# 只显示边界的标签
+# # 设置 x 和 y 轴的标签显示间隔
+# plt.gca().xaxis.set_major_locator(ticker.MultipleLocator(base=10))  # 每隔 5 个显示一次标签
+# plt.gca().yaxis.set_major_locator(ticker.MultipleLocator(base=10))
+# 旋转标签
+plt.xticks(rotation=45)
+plt.yticks(rotation=45)
+
+
 plt.title("Consensus Matrix Heatmap")
 plt.xlabel("Reward Value")
 plt.ylabel("Reward Value") 
