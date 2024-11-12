@@ -27,7 +27,7 @@ from tianshou.utils.space_info import SpaceInfo
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", type=str, default="MontezumaRevenge-ram-v4")
+    parser.add_argument("--task", type=str, default="Pitfall-ram-v4")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--scale-obs", type=int, default=0)
     parser.add_argument("--eps-test", type=float, default=0.005)
@@ -182,8 +182,6 @@ def main(args: argparse.Namespace = get_args()) -> None:
         else:
             eps = args.eps_train_final
         policy.set_eps(eps)
-        if env_step % 1000 == 0:
-            logger.write("train/env_step", env_step, {"train/eps": eps})
 
     def test_fn(epoch: int, env_step: int | None) -> None:
         policy.set_eps(args.eps_test)
