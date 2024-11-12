@@ -10,7 +10,7 @@ Type='framework'
 task='Hero'
 
 # 定义源目录
-source_dir = "draw/draw_source/framework/Seaquest/"
+source_dir = "draw/draw_source/framework/Hero"
 
 # 查找所有的 events 文件
 event_files = glob(os.path.join(source_dir, "**/events.out.tfevents.*"), recursive=True)
