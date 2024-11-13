@@ -6,7 +6,7 @@ from network import ResNet,FCNet
 import os   
     
 class Reward_Estimator:
-    def __init__(self, obs_dim, act_dim,device,network_type='FCNet',data_augmentation=None,is_L2=False):
+    def __init__(self, obs_dim, act_dim,device,network_type='FCNet',data_augmentation=None,is_L2=False,is_store=False):
         '''要求环境的action是discrete
         
 
@@ -28,7 +28,7 @@ class Reward_Estimator:
         self.device=device
         self.data_augmentation=data_augmentation
         self.is_L2=is_L2
-        self.is_store=False
+        self.is_store=is_store
 
     def get_input_data(self, buffer, mask_nonzero):
         obs = torch.tensor(buffer.obs[mask_nonzero], device=self.device)

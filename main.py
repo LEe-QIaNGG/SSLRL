@@ -89,14 +89,20 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--is_L2",
         type=bool,
-        default=False,
+        # default=True,
         help="weight for the forward model loss in ICM",
     )
     parser.add_argument(
         "--data_augmentation",
         type=str,
-        default="translate",
+        # default="smooth",
         help="cutout,shannon,smooth,scale,translate,flip",
+    )
+    parser.add_argument(
+        "--is_store",
+        type=bool,
+        # default="smooth",
+        help="buffer,reward distribution",
     )
     return parser.parse_args()
 
@@ -120,7 +126,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     action_shape = space_info.action_info.action_shape
     net = Net(state_shape=state_shape, action_shape=action_shape, hidden_sizes=[128, 128, 128],device=args.device)
     optim = torch.optim.Adam(net.parameters(), lr=args.lr)
-    reward_estimator=Reward_Estimator(args.state_shape[0], act_dim=1,device=args.device,data_augmentation=args.data_augmentation,is_L2=args.is_L2)
+    reward_estimator=Reward_Estimator(args.state_shape[0], act_dim=1,device=args.device,data_augmentation=args.data_augmentation,is_L2=args.is_L2,is_store=args.is_store)
     # define policy
     policy= DQNPolicy(
         model=net,
