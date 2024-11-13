@@ -22,7 +22,7 @@ from tianshou.trainer import OffpolicyTrainer
 from tianshou.utils.space_info import SpaceInfo
 from training_functions import Reward_Estimator
 
-TEST_TYPE='DA_test'
+
 LOG_DIR='log'
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -104,6 +104,12 @@ def get_args() -> argparse.Namespace:
         # default="smooth",
         help="buffer,reward distribution",
     )
+    parser.add_argument(
+        "--test_type",
+        type=str,
+        # default="smooth",
+        help="DA_test,framework_test",
+    )
     return parser.parse_args()
 
 
@@ -154,7 +160,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     # log
     now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
     args.algo_name = "dqn_icm" if args.icm_lr_scale > 0 else "dqn"
-    log_name = os.path.join(args.task, TEST_TYPE,args.data_augmentation+' L2 '+str(args.is_L2)+now)
+    log_name = os.path.join(args.task, args.test_type,args.data_augmentation+' L2 '+str(args.is_L2)+now)
     log_path = os.path.join(args.logdir, log_name)
 
 
