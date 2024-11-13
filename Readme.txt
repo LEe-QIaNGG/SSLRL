@@ -15,4 +15,4 @@ tensorboard --logdir="log/Hero-ram-v4/framework_test/" --port 6006
 conda env create -f tianshou_env.yaml
 conda activate tianshou_env
 gpu-interactive
-python main.py --task MontezumaRevenge-ram-v4 --is_L2 1 --data_augmentation shannon --is_store 1
+python main.py --task MontezumaRevenge-ram-v4 --is_L2 1 --data_augmentation smooth --is_store 0 --test_type framework_test
