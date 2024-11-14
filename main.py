@@ -130,7 +130,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     action_shape = space_info.action_info.action_shape
     net = Net(state_shape=state_shape, action_shape=action_shape, hidden_sizes=[128, 128, 128],device=args.device)
     optim = torch.optim.Adam(net.parameters(), lr=args.lr)
-    reward_estimator=Reward_Estimator(args.state_shape[0], act_dim=1,device=args.device,data_augmentation=args.data_augmentation,is_L2=args.is_L2,is_store=args.is_store)
+    reward_estimator=Reward_Estimator(args)
     # define policy
     policy= DQNPolicy(
         model=net,

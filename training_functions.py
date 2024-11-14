@@ -10,29 +10,28 @@ from data_augmentation import (
 )
     
 class Reward_Estimator:
-    def __init__(self, obs_dim, act_dim,device,network_type='FCNet',data_augmentation=None,is_L2=False,is_store=False):
-        '''要求环境的action是discrete
-        
-
+    def __init__(self,args, act_dim=1,network_type='FCNet'):
+        '''要求环境的action是discrete,reward是discrete
         '''
-        self.obs_dim = obs_dim
+        self.obs_dim = args.state_shape[0]
         self.act_dim = act_dim
         self.num_reward = 12
         if network_type == 'ResNet':
-            self.Qnet = ResNet(obs_dim+act_dim, self.num_reward).to(device)
-            self.Vnet = ResNet(obs_dim, self.num_reward ).to(device)
+            self.Qnet = ResNet(self.obs_dim+self.act_dim, self.num_reward).to(args.device)
+            self.Vnet = ResNet(self.obs_dim, self.num_reward ).to(args.device)
         elif network_type == 'FCNet':
-            self.Qnet = FCNet(obs_dim+act_dim, self.num_reward).to(device)
-            self.Vnet = FCNet(obs_dim, self.num_reward).to(device)
+            self.Qnet = FCNet(self.obs_dim+self.act_dim, self.num_reward).to(args.device)
+            self.Vnet = FCNet(self.obs_dim, self.num_reward).to(args.device)
         self.optim_Q= torch.optim.Adam(self.Qnet.parameters(), lr=1e-3)
         self.optim_V= torch.optim.Adam(self.Vnet.parameters(), lr=1e-3)
         self.reward_list = [0] * self.num_reward
         self.true_reward=[0]
         self.threshold=0.7
-        self.device=device
-        self.data_augmentation=data_augmentation
-        self.is_L2=is_L2
-        self.is_store=is_store
+        self.device=args.device
+        self.data_augmentation=args.data_augmentation
+        self.is_L2=args.is_L2
+        self.is_store=args.is_store
+        self.task=args.task
 
     def get_input_data(self, buffer, mask_nonzero):
         obs = torch.tensor(buffer.obs[mask_nonzero], device=self.device)
@@ -127,7 +126,7 @@ class Reward_Estimator:
         num_real_reward=np.sum(~mask)
         mask = torch.from_numpy(mask)
         if num_real_reward<10:
-            update_prob=0.0005
+            update_prob=0.0004
         else:
             if iter<num_iter/3:
                 update_prob=min(num_real_reward/len(mask),0.005)
@@ -162,7 +161,7 @@ class Reward_Estimator:
                 buffer.rew[mask][update_mask] = new_rewards.numpy()
 
                 if iter%40000==0 and iter!=0 and self.is_store:
-                    log_path = os.path.join("log", "reward_distribution",'Hero-ram-v4'+str(self.is_L2))
+                    log_path = os.path.join("log", "reward_distribution",self.task+str(self.is_L2))
                     os.makedirs(log_path, exist_ok=True)
                     rewards_file = os.path.join(log_path, f"rewards_iter_{iter}.npy")
                     mask_file = os.path.join(log_path, f"mask_iter_{iter}.npy")
@@ -173,7 +172,7 @@ class Reward_Estimator:
                     np.save(update_mask_file, update_mask)
                     np.save(new_rewards_file, new_rewards.numpy())
                 if iter>199990 and self.is_store:
-                    log_path = os.path.join("log", "buffer",'Hero-ram-v4'+str(self.is_L2))
+                    log_path = os.path.join("log", "buffer",self.task+str(self.is_L2))
                     os.makedirs(log_path, exist_ok=True)
                     obs_file = os.path.join(log_path, f"obs.npy")
                     action_file = os.path.join(log_path, f"action.npy")
