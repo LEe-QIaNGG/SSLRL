@@ -12,7 +12,6 @@ from gymnasium.spaces import Box, Discrete, MultiBinary, MultiDiscrete
 
 import tianshou as ts
 from tianshou.data import Collector, CollectStats    , VectorReplayBuffer
-# from Buffer import VectorReplayBuffer
 from tianshou.highlevel.logger import LoggerFactoryDefault
 from tianshou.utils.logger.tensorboard import TensorboardLogger
 from torch.utils.tensorboard import SummaryWriter
@@ -22,8 +21,7 @@ from tianshou.trainer import OffpolicyTrainer
 from tianshou.utils.space_info import SpaceInfo
 from training_functions import Reward_Estimator
 
-TEST_TYPE='framework_test'
-LOG_DIR='log'
+
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, default="Hero-ram-v4")
@@ -44,7 +42,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=256)  
     parser.add_argument("--training-num", type=int, default=10)  
     parser.add_argument("--test-num", type=int, default=2) 
-    parser.add_argument("--logdir", type=str, default=LOG_DIR)
+    parser.add_argument("--logdir", type=str, default='log_test')
     parser.add_argument("--render", type=float, default=0.0)
     parser.add_argument(
         "--device",
@@ -89,20 +87,26 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--is_L2",
         type=bool,
-        # default=True,
+        default=False,
         help="weight for the forward model loss in ICM",
     )
     parser.add_argument(
         "--data_augmentation",
         type=str,
-        # default="smooth",
+        default="cutout",
         help="cutout,shannon,smooth,scale,translate,flip",
     )
     parser.add_argument(
         "--is_store",
         type=bool,
-        # default="smooth",
+        default=False,
         help="buffer,reward distribution",
+    )
+    parser.add_argument(
+        "--test_type",
+        type=str,
+        default="DA_test",
+        help="DA_test,framework_test",
     )
     return parser.parse_args()
 
@@ -154,7 +158,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     # log
     now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
     args.algo_name = "dqn_icm" if args.icm_lr_scale > 0 else "dqn"
-    log_name = os.path.join(args.task, TEST_TYPE,args.data_augmentation+' L2 '+str(args.is_L2)+now)
+    log_name = os.path.join(args.task, args.test_type,args.data_augmentation+' L2 '+str(args.is_L2)+now)
     log_path = os.path.join(args.logdir, log_name)
 
 

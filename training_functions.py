@@ -4,6 +4,10 @@ import numpy as np
 import torchvision
 from network import ResNet,FCNet
 import os   
+from data_augmentation import (
+    shannon_augment, cutout_augment, gaussian_noise_augment,
+    flip_augment, scale_augment, translate_augment, smooth_augment
+)
     
 class Reward_Estimator:
     def __init__(self, obs_dim, act_dim,device,network_type='FCNet',data_augmentation=None,is_L2=False,is_store=False):
@@ -37,145 +41,6 @@ class Reward_Estimator:
         action = action.unsqueeze(1)  # 添加这一行
         return torch.cat([obs, next_obs, action], dim=-1).float()
     
-    def shannon_augment(self, input_data, n=16):
-        data_without_action = input_data[:, :-self.act_dim]
-        action = input_data[:, -self.act_dim:]
-        
-        # 将data_without_action纵向分为n个块
-        chunk_size = data_without_action.shape[1] // n
-        chunks = [data_without_action[:, i*chunk_size:(i+1)*chunk_size] for i in range(n)]
-        
-        # 计算每个块的香农熵并乘以相应的块
-        augmented_chunks = []
-        for chunk in chunks:
-            # 将数据离散化
-            binned_data = torch.histc(chunk, bins=256, min=chunk.min(), max=chunk.max())
-            # 计算概率分布
-            probs = binned_data / binned_data.sum()
-            # 计算香农熵
-            entropy = -torch.sum(probs * torch.log2(probs + 1e-10))
-            # 将块乘以其香农熵
-            augmented_chunks.append(chunk * entropy.item())
-        
-        # 拼接增强后的数据块
-        augmented_data = torch.cat(augmented_chunks, dim=1)
-        
-        # 重新组合数据并返回
-        return torch.cat([augmented_data, action], dim=-1) 
-
-    def cutout_augment(self, input_data):
-        n = int(np.log2(self.act_dim) / 2)
-        # 分离action列
-        data_without_action = input_data[:, :-self.act_dim]
-        action = input_data[:, -self.act_dim:]
-        
-        # 随机选择n列
-        num_cols = data_without_action.shape[1]
-        cols_to_zero = torch.randperm(num_cols)[:n]
-        
-        # 将选中的列置为零
-        data_without_action[:, cols_to_zero] = 0
-        
-        # 重新组合数据
-        return torch.cat([data_without_action, action], dim=-1)
-
-    def GaussianNoise_augment(self, input_data,sigma=0.1):
-        # 分离action列
-        data_without_action = input_data[:, :-self.act_dim]
-        action = input_data[:, -self.act_dim:]
-        
-        # 对除action外的数据添加高斯噪声
-        noise = torch.randn_like(data_without_action) * sigma  # 0.1是噪声强度，可以根据需要调整
-        augmented_data = data_without_action + noise
-        
-        # 重新组合数据
-        return torch.cat([augmented_data, action], dim=-1)
-    
-    def flip_augment(self, input_data):
-        # 分离action列
-        data_without_action = input_data[:, :-self.act_dim]
-        action = input_data[:, -self.act_dim:]
-        
-        # 将data_without_action分为obs和obs_next
-        obs_dim = data_without_action.shape[1] // 2
-        obs = data_without_action[:, :obs_dim]
-        obs_next = data_without_action[:, obs_dim:]
-        
-        # 分别对obs和obs_next进行翻转操作
-        flipped_obs = torch.flip(obs, dims=[1])
-        flipped_obs_next = torch.flip(obs_next, dims=[1])
-        
-        # 重新组合翻转后的数据
-        flipped_data = torch.cat([flipped_obs, flipped_obs_next], dim=1)     
-        # 重新组合数据
-        return torch.cat([flipped_data, action], dim=-1)
-    
-    def scale_augment(self, input_data, scale_range=(0.8, 1.2)):
-        # 分离action列
-        data_without_action = input_data[:, :-self.act_dim]
-        action = input_data[:, -self.act_dim:]
-        
-        # 将data_without_action分为obs和obs_next
-        obs_dim = data_without_action.shape[1] // 2
-        obs = data_without_action[:, :obs_dim]
-        obs_next = data_without_action[:, obs_dim:]
-        
-        # 为每个样本生成随机缩放因子
-        batch_size = obs.shape[0]
-        scale_factors = torch.empty(batch_size, 1).uniform_(scale_range[0], scale_range[1]).to(obs.device)
-        
-        # 对obs和obs_next分别进行缩放
-        scaled_obs = obs * scale_factors
-        scaled_obs_next = obs_next * scale_factors
-        
-        # 重新组合缩放后的数据
-        scaled_data = torch.cat([scaled_obs, scaled_obs_next], dim=1)
-        
-        # 重新组合数据并返回
-        return torch.cat([scaled_data, action], dim=-1)
-    
-    def translate_augment(self, input_data, translate_range=(0.1, 0.1)):
-        # 分离action列
-        data_without_action = input_data[:, :-self.act_dim]
-        action = input_data[:, -self.act_dim:]
-        
-        # 将data_without_action分为obs和obs_next
-        obs_dim = data_without_action.shape[1] // 2
-        obs = data_without_action[:, :obs_dim]
-        obs_next = data_without_action[:, obs_dim:]
-        
-        # 创建RandomAffine实例用于平移
-        transform = torchvision.transforms.RandomAffine(
-            degrees=0,  # 不进行旋转
-            translate=translate_range  # 平移范围
-        )
-        
-        # 分别对obs和obs_next进行平移操作
-        translated_obs = transform(obs.unsqueeze(0)).squeeze(0)
-        translated_obs_next = transform(obs_next.unsqueeze(0)).squeeze(0)
-        
-        # 重新组合平移后的数据
-        translated_data = torch.cat([translated_obs, translated_obs_next], dim=1)
-        
-        # 重新组合数据并返回
-        return torch.cat([translated_data, action], dim=-1)
-        
-    
-    def smooth_augment(self, input_data, n=3):
-        # 分离action列
-        data_without_action = input_data[:, :-self.act_dim]
-        action = input_data[:, -self.act_dim:]
-        
-        # 对除action外的数据进行n条数据间的平滑操作
-        smoothed_data = torch.zeros_like(data_without_action)
-        for i in range(data_without_action.shape[1]):
-            start = max(0, i - n // 2)
-            end = min(data_without_action.shape[1], i + n // 2 + 1)
-            smoothed_data[:, i] = torch.mean(data_without_action[:, start:end], dim=1)
-        
-        # 重新组合数据
-        return torch.cat([smoothed_data, action], dim=-1)
-    
     def calculate_mask(self, buffer):
         reward_list=np.array(self.true_reward[self.true_reward != 0])
         return ~np.isin(buffer.rew, reward_list)
@@ -197,19 +62,19 @@ class Reward_Estimator:
         input_data_zero = self.get_input_data(buffer, mask_zero)
 
         #data augmentation
-        input_data_zero_weak = self.GaussianNoise_augment(input_data_zero)
-        if self.data_augmentation=='shannon':
-            input_data_zero_strong = self.shannon_augment(input_data_zero)
-        elif self.data_augmentation=='cutout':
-            input_data_zero_strong = self.cutout_augment(input_data_zero)
-        elif self.data_augmentation=='smooth':
-            input_data_zero_strong = self.smooth_augment(input_data_zero)
-        elif self.data_augmentation=='scale':
-            input_data_zero_strong = self.scale_augment(input_data_zero)
-        elif self.data_augmentation=='translate':
-            input_data_zero_strong = self.translate_augment(input_data_zero)
-        elif self.data_augmentation=='flip':
-            input_data_zero_strong = self.flip_augment(input_data_zero)
+        input_data_zero_weak = gaussian_noise_augment(input_data_zero, self.act_dim)
+        if self.data_augmentation == 'shannon':
+            input_data_zero_strong = shannon_augment(input_data_zero, self.act_dim)
+        elif self.data_augmentation == 'cutout':
+            input_data_zero_strong = cutout_augment(input_data_zero, self.act_dim, self.obs_dim)
+        elif self.data_augmentation == 'smooth':
+            input_data_zero_strong = smooth_augment(input_data_zero, self.act_dim)
+        elif self.data_augmentation == 'scale':
+            input_data_zero_strong = scale_augment(input_data_zero, self.act_dim)
+        elif self.data_augmentation == 'translate':
+            input_data_zero_strong = translate_augment(input_data_zero, self.act_dim)
+        elif self.data_augmentation == 'flip':
+            input_data_zero_strong = flip_augment(input_data_zero, self.act_dim)
 
         confidence_scores_weak,loss_constancy_weak = self.get_QVconfidence(input_data_zero_weak, is_L2=is_L2)
         confidence_scores_strong,loss_constancy_strong = self.get_QVconfidence(input_data_zero_strong, is_L2=is_L2)
@@ -262,7 +127,7 @@ class Reward_Estimator:
         num_real_reward=np.sum(~mask)
         mask = torch.from_numpy(mask)
         if num_real_reward<10:
-            update_prob=0.002
+            update_prob=0.0005
         else:
             if iter<num_iter/3:
                 update_prob=min(num_real_reward/len(mask),0.005)
