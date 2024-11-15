@@ -6,11 +6,11 @@ from glob import glob
 import pandas as pd
 # 定义颜色列表
 colors = ['blue', 'red', 'green', 'orange', 'purple']
-Type='framework'
+Type='DA'
 task='Hero'
 
 # 定义源目录
-source_dir = "draw/draw_source/framework/Hero"
+source_dir = "log/Hero-ram-v4/DA_test/"
 
 # 查找所有的 events 文件
 event_files = glob(os.path.join(source_dir, "**/events.out.tfevents.*"), recursive=True)
@@ -53,7 +53,7 @@ for i, event_file in enumerate(event_files):
 
     # 绘制线条和浅色区域
     folder_name = os.path.basename(os.path.dirname(event_file))
-    algorithm_name = folder_name.split(' L2')[0]
+    algorithm_name = folder_name.split(' L2')[0] if ' L2' in folder_name else folder_name.split('_24')[0]
     color = color_mapping.get(algorithm_name, colors[i % len(colors)])  # 如果找不到映射就使用默认颜色
 
     # 将数据转为 pandas.Series 对象，方便处理
@@ -67,7 +67,7 @@ for i, event_file in enumerate(event_files):
         label = algorithm_name
     plt.plot(steps, smoothed_rewards, label=label, color=color)
     plt.fill_between(steps, 
-                    smoothed_rewards - np.array(best_reward_stds), 
+                    np.maximum(0, smoothed_rewards - np.array(best_reward_stds)), 
                     smoothed_rewards + np.array(best_reward_stds), 
                     alpha=0.2, color=color)
 

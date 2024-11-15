@@ -24,7 +24,7 @@ from training_functions import Reward_Estimator
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", type=str, default="Hero-ram-v4")
+    parser.add_argument("--task", type=str, default="Pong-ram-v4")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--scale-obs", type=int, default=0)
     parser.add_argument("--eps-test", type=float, default=0.005)
@@ -99,7 +99,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--is_store",
         type=bool,
-        default=False,
+        default=True,
         help="buffer,reward distribution",
     )
     parser.add_argument(

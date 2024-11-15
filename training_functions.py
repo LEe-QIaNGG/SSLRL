@@ -126,14 +126,14 @@ class Reward_Estimator:
         num_real_reward=np.sum(~mask)
         mask = torch.from_numpy(mask)
         if num_real_reward<10:
-            update_prob=0.0004
+            update_prob=0.0008
         else:
             if iter<num_iter/3:
-                update_prob=min(num_real_reward/len(mask),0.005)
+                update_prob=min(2*num_real_reward/len(mask),0.005)
             elif iter<2*num_iter/3:
-                update_prob=min(num_real_reward/len(mask),0.05)
+                update_prob=min(2*num_real_reward/len(mask),0.05)
             else:
-                update_prob=min(num_real_reward/len(mask),0.01)
+                update_prob=min(2*num_real_reward/len(mask),0.01)
         mask = torch.where(torch.rand_like(mask.float()) < update_prob, mask, torch.zeros_like(mask,dtype=torch.bool))
         #mask buffer_size
 
@@ -152,34 +152,37 @@ class Reward_Estimator:
                 new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
                 buffer.rew[mask][update_mask] = new_rewards.numpy()
 
-                if iter%40000==0 and iter!=0 and self.is_store:
-                    log_path = os.path.join("log", "reward_distribution",self.task+str(self.is_L2))
-                    os.makedirs(log_path, exist_ok=True)
-                    rewards_file = os.path.join(log_path, f"rewards_iter_{iter}.npy")
-                    mask_file = os.path.join(log_path, f"mask_iter_{iter}.npy")
-                    update_mask_file = os.path.join(log_path, f"update_mask_iter_{iter}.npy")
-                    new_rewards_file = os.path.join(log_path, f"new_rewards_iter_{iter}.npy")
-                    np.save(rewards_file, buffer.rew)
-                    np.save(mask_file, mask)
-                    np.save(update_mask_file, update_mask)
-                    np.save(new_rewards_file, new_rewards.numpy())
-                if iter>199990 and self.is_store:
-                    log_path = os.path.join("log", "buffer",self.task+str(self.is_L2))
-                    os.makedirs(log_path, exist_ok=True)
-                    obs_file = os.path.join(log_path, f"obs.npy")
-                    action_file = os.path.join(log_path, f"action.npy")
-                    obs_next_file = os.path.join(log_path, f"obs_next.npy")
-                    rew_file = os.path.join(log_path, f"rew.npy")
-                    mask_file = os.path.join(log_path, f"mask.npy")
-                    update_mask_file = os.path.join(log_path, f"update_mask.npy")
-                    new_rewards_file = os.path.join(log_path, f"new_rewards.npy")
-                    np.save(obs_file, buffer.obs)
-                    np.save(action_file, buffer.act)
-                    np.save(obs_next_file, buffer.obs_next)
-                    np.save(rew_file, buffer.rew)
-                    np.save(mask_file, mask)
-                    np.save(update_mask_file, update_mask)  
-                    np.save(new_rewards_file, new_rewards.numpy())
+                if iter%40000>35000 and self.is_store:
+                    reward_log_path = os.path.join("log", "reward_distribution",self.task+str(self.is_L2))
+                    os.makedirs(reward_log_path, exist_ok=True)
+                    n=(iter//40000)+1
+                    rewards_file = os.path.join(reward_log_path, f"rewards_iter_{n}.npy")
+                    if not os.path.exists(rewards_file):
+                        mask_file = os.path.join(reward_log_path, f"mask_iter_{n}.npy")
+                        update_mask_file = os.path.join(reward_log_path, f"update_mask_iter_{n}.npy")
+                        new_rewards_file = os.path.join(reward_log_path, f"new_rewards_iter_{n}.npy")
+                        np.save(rewards_file, buffer.rew)
+                        np.save(mask_file, mask)
+                        np.save(update_mask_file, update_mask)
+                        np.save(new_rewards_file, new_rewards.numpy())
+                if iter>195000 and self.is_store:
+                    buffer_log_path = os.path.join("log", "buffer",self.task+str(self.is_L2))
+                    os.makedirs(buffer_log_path, exist_ok=True)
+                    obs_file = os.path.join(buffer_log_path, f"obs.npy")
+                    if not os.path.exists(obs_file):    
+                        action_file = os.path.join(buffer_log_path, f"action.npy")
+                        obs_next_file = os.path.join(buffer_log_path, f"obs_next.npy")
+                        rew_file = os.path.join(buffer_log_path, f"rew.npy")
+                        mask_file = os.path.join(buffer_log_path, f"mask.npy")
+                        update_mask_file = os.path.join(buffer_log_path, f"update_mask.npy")
+                        new_rewards_file = os.path.join(buffer_log_path, f"new_rewards.npy")
+                        np.save(obs_file, buffer.obs)
+                        np.save(action_file, buffer.act)
+                        np.save(obs_next_file, buffer.obs_next)
+                        np.save(rew_file, buffer.rew)
+                        np.save(mask_file, mask)
+                        np.save(update_mask_file, update_mask)  
+                        np.save(new_rewards_file, new_rewards.numpy())
                     
 
 
