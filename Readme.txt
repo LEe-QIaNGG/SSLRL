@@ -15,5 +15,5 @@ tensorboard --logdir="log/Hero-ram-v4/DA_test/scale L2 False241108-142400" --por
 tensorboard --logdir="log/Hero-ram-v4/framework_test/" --port 6006
 conda activate tianshou_env
 gpu-interactive
-python main.py --task Venture-ram-v4 --is_L2 0 --data_augmentation cutout --is_store 0 --test_type DA_test --log_dir log_test
+python main.py --task MontezumaRevenge-ram-v4 --is_L2 0 --data_augmentation scale --is_store 0 --test_type DA_test --logdir log
 python baseline.py --task Venture-ram-v4 

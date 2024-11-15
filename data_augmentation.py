@@ -72,7 +72,7 @@ def scale_augment(input_data, act_dim, scale_range=(0.8, 1.2)):
     scaled_data = torch.cat([scaled_obs, scaled_obs_next], dim=1)
     return torch.cat([scaled_data, action], dim=-1)
 
-def translate_augment(input_data, act_dim, translate_range=(0.1, 0.1)):
+def translate_augment(input_data, act_dim, translate_range=(0.1, 0.)):
     data_without_action = input_data[:, :-act_dim]
     action = input_data[:, -act_dim:]
     

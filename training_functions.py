@@ -150,14 +150,6 @@ class Reward_Estimator:
             update_mask = max_confidence > self.threshold
             if sum(update_mask)>1:
                 new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
-                # # 使用 mask 筛选 buffer.rew 中的元素
-                # selected_rewards = buffer.rew[mask]
-
-                # # 使用 update_mask 进一步筛选
-                # selected_rewards[update_mask] = new_rewards.numpy()
-
-                # # 更新 buffer 中的值
-                # buffer.rew[mask] = selected_rewards
                 buffer.rew[mask][update_mask] = new_rewards.numpy()
 
                 if iter%40000==0 and iter!=0 and self.is_store:
