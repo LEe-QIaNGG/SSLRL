@@ -1,14 +1,16 @@
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
+from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.mixture import GaussianMixture
+from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
 import matplotlib.ticker as ticker
 
 source_path = 'log/buffer/Hero-ram-v4True/'
-target_path = 'draw/result/cluster/Hero-ram-v4True/'
+target_path = 'draw/result/cluster/MontezumaRevenge/'
 action=np.load(source_path+'action.npy')
 obs=np.load(source_path+'obs.npy')
 obs_next=np.load(source_path+'obs_next.npy')
@@ -18,6 +20,8 @@ update_mask=np.load(source_path+'update_mask.npy')
 new_rewards=np.load(source_path+'new_rewards.npy')
 mask[mask] = update_mask
 reward[mask] = new_rewards
+method = 'tSNE+GMM'
+num_iterations=100
 
 # 定义计算共识矩阵的函数
 def consensus_matrix(data, num_clusters, num_iterations, real_labels,method):
@@ -33,22 +37,38 @@ def consensus_matrix(data, num_clusters, num_iterations, real_labels,method):
         if method == 'KMeans':
             clustering = KMeans(n_clusters=num_clusters, random_state=None).fit(data)
             labels = clustering.labels_
-        else:
+        elif method == 'GMM':
+            clustering = GaussianMixture(n_components=num_clusters, random_state=None).fit(data)
+            labels = clustering.predict(data)
+        elif method == 'PCA+KMeans':
+            pca = PCA(n_components=num_clusters)
+            data = pca.fit_transform(data)
+            clustering = KMeans(n_clusters=num_clusters, random_state=None).fit(data)
+            labels = clustering.labels_
+        elif method == 'PCA+GMM':
+            pca = PCA(n_components=num_clusters)
+            data = pca.fit_transform(data)
+            clustering = GaussianMixture(n_components=num_clusters, random_state=None).fit(data)
+            labels = clustering.predict(data)
+        elif method == 'tSNE+KMeans':
+            tsne = TSNE(n_components=3)
+            data = tsne.fit_transform(data)
+            clustering = KMeans(n_clusters=num_clusters, random_state=None).fit(data)
+            labels = clustering.labels_
+        elif method == 'tSNE+GMM':
+            tsne = TSNE(n_components=3)
+            data = tsne.fit_transform(data)
             clustering = GaussianMixture(n_components=num_clusters, random_state=None).fit(data)
             labels = clustering.predict(data)
         for i in range(N):
             for j in range(N):
                 if labels[i] == labels[j]:
                     consensus[i, j] += 1
-    
     consensus /= num_iterations
     
     # 对共识矩阵进行重排
     # consensus = consensus[sort_idx][:, sort_idx]
     return consensus
-
-method = 'GMM'
-num_iterations=100
 
 data=np.concatenate((obs, action[:, np.newaxis], obs_next), axis=1)
 scaler = StandardScaler()  # 使用标准化
@@ -103,72 +123,3 @@ plt.title("Consensus Matrix Heatmap")
 plt.xlabel("Reward Value")
 plt.ylabel("Reward Value") 
 plt.savefig(target_path+"consensus_matrix_heatmap_{}_{}.png".format(centers,method))
-
-
-# # 定义聚类方法及参数
-# methods = {
-#     "KMeans_k="+str(len(np.unique(sample_labels))): KMeans(n_clusters=len(np.unique(sample_labels))),
-#     "DBSCAN": DBSCAN(eps=1 , min_samples=5),
-#     "Agglomerative_k="+str(len(np.unique(sample_labels))): AgglomerativeClustering(n_clusters=len(np.unique(sample_labels)))
-# }
-
-# # 存储聚类结果及评价指标
-# results = []
-
-# # 执行聚类并评估
-# for name, model in methods.items():
-#     model.fit(sample_data)
-
-#     if hasattr(model, 'labels_'):
-#         labels = model.labels_
-#     else:
-#         labels = model.predict(sample_data)
-    
-#     ari = adjusted_rand_score(sample_labels, labels)
-#     nmi = normalized_mutual_info_score(sample_labels, labels)
-#     silhouette = silhouette_score(sample_data, sample_labels)
-    
-#     results.append({
-#         "Method": name,
-#         "ARI": ari,
-#         "NMI": nmi,
-#         "Silhouette Score": silhouette
-#     })
-
-# # 展示评价结果
-# results_df = pd.DataFrame(results)
-# print(results_df)
-
-# # 降维处理，便于可视化
-# pca = PCA(n_components=2)
-# data_pca = pca.fit_transform(sample_data)
-
-# # 可视化每种聚类结果
-# fig, axes = plt.subplots(1, len(methods), figsize=(15, 5))
-
-# # for ax, (name, model) in zip(axes, methods.items()):
-# #     if hasattr(model, 'labels_'):
-# #         labels = model.labels_
-# #     else:
-# #         labels = model.predict(sample_data)
-    
-# #     scatter = ax.scatter(data_pca[:, 0], data_pca[:, 1], c=labels, cmap='viridis', s=50, alpha=0.7)
-# #     ax.set_title(name)
-# #     legend1 = ax.legend(*scatter.legend_elements(), title="Clusters")
-# #     ax.add_artist(legend1)
-
-# for ax, (name, model) in zip(axes, methods.items()):
-#     if hasattr(model, 'labels_'):
-#         labels = model.labels_
-#     else:
-#         labels = model.predict(sample_data)
-    
-#     # 通过颜色表示真实标签，不同透明度表示聚类标签
-#     for label in np.unique(labels):
-#         mask = labels == label
-#         ax.scatter(data_pca[mask, 0], data_pca[mask, 1], c=sample_labels[mask], cmap='viridis', 
-#                    s=50, alpha=0.4 + 0.4 * (labels[mask] == sample_labels[mask]))  # 增加透明度区分
-#     ax.set_title(name)
-
-# plt.suptitle("Clustering Results in 2D Space")
-# plt.savefig(target_path+'cluster_result.png')
