@@ -168,16 +168,13 @@ def main(args: argparse.Namespace = get_args()) -> None:
         pass
 
     def stop_fn(mean_rewards: float) -> bool:
-        if env.spec.reward_threshold:
-            return mean_rewards >= env.spec.reward_threshold
-        if "Pong" in args.task:
-            return mean_rewards >= 20
-        return False
+        pass
 
     def train_fn(epoch: int, env_step: int) -> None:
         # nature DQN setting, linear decay in the first 1M steps
-        if env_step <= 1e6:
-            eps = args.eps_train - env_step / 1e6 * (args.eps_train - args.eps_train_final)
+        num_steps = args.step_per_epoch*args.epoch
+        if env_step <= num_steps:
+            eps = args.eps_train - env_step / num_steps * (args.eps_train - args.eps_train_final)
         else:
             eps = args.eps_train_final
         policy.set_eps(eps)

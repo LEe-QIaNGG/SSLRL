@@ -177,6 +177,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
 
     def train_fn(epoch: int, env_step: int) -> None:
         # nature DQN setting, linear decay in the first 1M steps
+        num_steps = args.step_per_epoch*args.epoch
         if env_step <= 1e6:
             eps = args.eps_train - env_step / 1e6 * (args.eps_train - args.eps_train_final)
         else:

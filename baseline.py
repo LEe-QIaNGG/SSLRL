@@ -24,7 +24,7 @@ from tianshou.trainer import OffpolicyTrainer
 from tianshou.utils.net.discrete import IntrinsicCuriosityModule
 from tianshou.utils.space_info import SpaceInfo
 
-LOG_DIR='log'
+
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, default="Pitfall-ram-v4")
@@ -45,7 +45,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=256)  
     parser.add_argument("--training-num", type=int, default=10)  
     parser.add_argument("--test-num", type=int, default=2)  
-    parser.add_argument("--logdir", type=str, default=LOG_DIR)
+    parser.add_argument("--logdir", type=str, default='log_test')
     parser.add_argument("--render", type=float, default=0.0)
     parser.add_argument(
         "--device",
@@ -160,6 +160,8 @@ def main(args: argparse.Namespace = get_args()) -> None:
 
     def train_fn(epoch: int, env_step: int) -> None:
         # nature DQN setting, linear decay in the first 1M steps
+        # env_step就是每个epoch的step,这里一个epoch执行200次，
+        num_steps=args.step_per_epoch*args.epoch
         if env_step <= 1e6:
             eps = args.eps_train - env_step / 1e6 * (args.eps_train - args.eps_train_final)
         else:
