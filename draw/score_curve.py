@@ -7,10 +7,10 @@ import pandas as pd
 # 定义颜色列表
 colors = ['blue', 'red', 'green', 'orange', 'purple']
 Type='DA'
-task='Hero'
+task='Venture'
 
 # 定义源目录
-source_dir = "log/Hero-ram-v4/DA_test/"
+source_dir = "log/Venture-ram-v4/DA_test"
 
 # 查找所有的 events 文件
 event_files = glob(os.path.join(source_dir, "**/events.out.tfevents.*"), recursive=True)
