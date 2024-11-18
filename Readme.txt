@@ -14,10 +14,13 @@ tensorboard --logdir="log/Hero-ram-v4/DA_test/" --port 6006
 tensorboard --logdir="log/Seaquest-ram-v4/framework_test/" --port 6006
 conda activate tianshou_env
 gpu-interactive
-python main.py --task Hero-ram-v4 --is_L2 1 --data_augmentation shannon --is_store 0 --test_type framework_test --logdir log
-python ICM.py --task Venture-ram-v4 
+python main.py --task Seaquest-ram-v4 --is_L2 1 --data_augmentation cutout --is_store 1 --test_type framework_test --logdir log
+python baseline.py --task Venture-ram-v4 
 
+
+是不是epsilon有问题
 Venture应该降低更新频率
+
 score curve更新
 framework  Hero MontezumaRevenge
 DA   MontezumaRevenge

@@ -150,19 +150,19 @@ class Reward_Estimator:
                 new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
                 buffer.rew[mask][update_mask] = new_rewards.numpy()
 
-                if iter%40000>30000 and self.is_store:
-                    reward_log_path = os.path.join("log", "reward_distribution",self.task,str(self.is_L2))
-                    os.makedirs(reward_log_path, exist_ok=True)
-                    n=(iter//40000)+1
-                    rewards_file = os.path.join(reward_log_path, f"rewards_iter_{n}.npy")
-                    if not os.path.exists(rewards_file):
-                        mask_file = os.path.join(reward_log_path, f"mask_iter_{n}.npy")
-                        update_mask_file = os.path.join(reward_log_path, f"update_mask_iter_{n}.npy")
-                        new_rewards_file = os.path.join(reward_log_path, f"new_rewards_iter_{n}.npy")
-                        np.save(rewards_file, buffer.rew)
-                        np.save(mask_file, mask)
-                        np.save(update_mask_file, update_mask)
-                        np.save(new_rewards_file, new_rewards.numpy())
+                # if iter%40000>30000 and self.is_store:
+                #     reward_log_path = os.path.join("log", "reward_distribution",self.task,str(self.is_L2))
+                #     os.makedirs(reward_log_path, exist_ok=True)
+                #     n=(iter//40000)+1
+                #     rewards_file = os.path.join(reward_log_path, f"rewards_iter_{n}.npy")
+                #     if not os.path.exists(rewards_file):
+                #         mask_file = os.path.join(reward_log_path, f"mask_iter_{n}.npy")
+                #         update_mask_file = os.path.join(reward_log_path, f"update_mask_iter_{n}.npy")
+                #         new_rewards_file = os.path.join(reward_log_path, f"new_rewards_iter_{n}.npy")
+                #         np.save(rewards_file, buffer.rew)
+                #         np.save(mask_file, mask)
+                #         np.save(update_mask_file, update_mask)
+                #         np.save(new_rewards_file, new_rewards.numpy())
                 if iter>190000 and self.is_store:
                     buffer_log_path = os.path.join("log", "buffer",self.task,str(self.is_L2))
                     os.makedirs(buffer_log_path, exist_ok=True)

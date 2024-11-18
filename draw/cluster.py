@@ -9,8 +9,8 @@ from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
 import matplotlib.ticker as ticker
 
-source_path = 'log/buffer/Venture-ram-v4/True/'
-target_path = 'draw/result/cluster/Venture/'
+source_path = 'log/buffer/Seaquest-ram-v4/'
+target_path = 'draw/result/cluster/Seaquest/'
 action = np.load(source_path + 'action.npy')
 obs = np.load(source_path + 'obs.npy')
 obs_next = np.load(source_path + 'obs_next.npy')
