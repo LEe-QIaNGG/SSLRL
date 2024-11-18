@@ -111,4 +111,4 @@ for method in methods:
     plt.title(f"Consensus Matrix Heatmap - {method}")
     plt.xlabel("Reward Value")
     plt.ylabel("Reward Value")
-    plt.savefig(target_path + f"consensus_matrix_heatmap_{centers}_{method}.png")
+    plt.savefig(target_path + f"consensus_matrix_heatmap_{centers}_{method}.eps")

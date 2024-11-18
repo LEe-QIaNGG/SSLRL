@@ -10,7 +10,7 @@ Type='DA'
 task='Venture'
 
 # 定义源目录
-source_dir = "log/Venture-ram-v4/DA_test"
+source_dir = "log/Venture-ram-v4/DA_test/"
 
 # 查找所有的 events 文件
 event_files = glob(os.path.join(source_dir, "**/events.out.tfevents.*"), recursive=True)
@@ -79,7 +79,7 @@ plt.legend()
 plt.grid(True)
 
 # 保存图片
-plt.savefig(f'draw/result/score/{Type}_{task}_best_reward.png')
+plt.savefig(f'draw/result/score/{Type}_{task}_best_reward.eps')
 plt.close()
 
-print(f"图像已保存为 {Type}_{task}_best_reward.png")
+print(f"图像已保存为 {Type}_{task}_best_reward.eps")

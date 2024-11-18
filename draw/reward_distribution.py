@@ -48,6 +48,6 @@ ax.set_zlabel("Normalized Frequency")
 ax.set_title("3D Distribution of Rewards Over Epochs")
 ax.legend()
 
-plt.savefig(source_path+'reward_distribution_3d.png')
+plt.savefig(source_path+'reward_distribution_3d.eps')
 
 
