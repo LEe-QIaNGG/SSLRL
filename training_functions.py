@@ -126,7 +126,7 @@ class Reward_Estimator:
         num_real_reward=np.sum(~mask)
         mask = torch.from_numpy(mask)
         if num_real_reward<50:
-            update_prob=0.01
+            update_prob=0.006
         else:
             if iter<num_iter/3:
                 update_prob=min(10*num_real_reward/len(mask),0.05)
