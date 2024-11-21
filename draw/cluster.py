@@ -9,7 +9,7 @@ from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
 import matplotlib.ticker as ticker
 
-source_path = 'log/buffer/Seaquest-ram-v4/'
+source_path = 'log/buffer/Seaquest-ram-v4/True/'
 target_path = 'draw/result/cluster/Seaquest/'
 action = np.load(source_path + 'action.npy')
 obs = np.load(source_path + 'obs.npy')
@@ -111,4 +111,4 @@ for method in methods:
     plt.title(f"Consensus Matrix Heatmap - {method}")
     plt.xlabel("Reward Value")
     plt.ylabel("Reward Value")
-    plt.savefig(target_path + f"consensus_matrix_heatmap_{centers}_{method}.eps")
+    plt.savefig(target_path + f"consensus_matrix_heatmap_{centers}_{method}.png")
