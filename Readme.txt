@@ -18,9 +18,6 @@ python main.py --task Seaquest-ram-v4 --is_L2 1 --data_augmentation cutout --is_
 python baseline.py --task Venture-ram-v4 --logdir log
 
 
-是不是epsilon有问题
-Venture应该降低更新频率/venture shannon降低了效果更差
-
 score curve更新
-framework  Hero MontezumaRevenge
-DA   MontezumaRevenge
+framework  venture
+DA   venture
