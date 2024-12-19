@@ -18,6 +18,6 @@ python main.py --task Seaquest-ram-v4 --is_L2 1 --data_augmentation cutout --is_
 python baseline.py --task Venture-ram-v4 --logdir log
 
 
-score curve更新
-framework  venture
-DA   venture
+pip install pytorch-lightning -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+python ./RCP/trainer.py --implementation RCP --gamename MontezumaRevenge-ram-v4 --exp_name debug --num_workers 1 --seed 25

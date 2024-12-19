@@ -13,7 +13,7 @@ from tianshou.utils.net.common import Net
 from gymnasium.spaces import Box, Discrete, MultiBinary, MultiDiscrete
 
 import tianshou as ts
-from tianshou.data import Collector, CollectStats, VectorReplayBuffer
+from tianshou.data import Collector, CollectStats, VectorReplayBuffer,PrioritizedReplayBuffer,HERReplayBuffer
 from tianshou.highlevel.logger import LoggerFactoryDefault
 from tianshou.utils.logger.tensorboard import TensorboardLogger
 from torch.utils.tensorboard import SummaryWriter
@@ -28,6 +28,7 @@ from tianshou.utils.space_info import SpaceInfo
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, default="Pitfall-ram-v4")
+    parser.add_argument("--buffer-type",type=str,default='per')
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--scale-obs", type=int, default=0)
     parser.add_argument("--eps-test", type=float, default=0.005)
@@ -43,8 +44,8 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
     parser.add_argument("--batch-size", type=int, default=256)  
-    parser.add_argument("--training-num", type=int, default=10)  
-    parser.add_argument("--test-num", type=int, default=2)  
+    parser.add_argument("--training-num", type=int, default=1)  
+    parser.add_argument("--test-num", type=int, default=1)  
     parser.add_argument("--logdir", type=str, default='log_test')
     parser.add_argument("--render", type=float, default=0.0)
     parser.add_argument(
@@ -129,12 +130,29 @@ def main(args: argparse.Namespace = get_args()) -> None:
         policy.load_state_dict(torch.load(args.resume_path, map_location=args.device))
         print("Loaded agent from: ", args.resume_path)
 
-    buffer = VectorReplayBuffer(
-        args.buffer_size,
-        buffer_num=args.training_num,
-        ignore_obs_next=True,
+    if args.buffer_type == "vector":
+        buffer = VectorReplayBuffer(
+            args.buffer_size,
+            buffer_num=args.training_num,
+            ignore_obs_next=True,
+        )
+    elif args.buffer_type == "per":
+        buffer = PrioritizedReplayBuffer(
+            size=args.buffer_size,
+            alpha=0.6, beta=0.4,
+            buffer_num=args.training_num,
+            ignore_obs_next=True,
+        )
+    elif args.buffer_type == "her":
+        buffer = HERReplayBuffer(
+            size=args.buffer_size,
+            buffer_num=args.training_num,
+            compute_reward_fn=compute_reward_fn,
+            horizon=50,
+            future_k=8,
+        )
 
-    )
+
     # collector
     train_collector = Collector[CollectStats](policy, train_envs, buffer, exploration_noise=True)
     test_collector = Collector[CollectStats](policy, test_envs, exploration_noise=True)
@@ -142,7 +160,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     # log
     now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
     args.algo_name = "dqn_icm" if args.icm_lr_scale > 0 else "dqn"
-    log_name = os.path.join(args.task, 'framework_test', 'baseline_'+ now)
+    log_name = os.path.join(args.task, 'framework_test', 'baseline_per_'+ now)
     log_path = os.path.join(args.logdir, log_name)
 
     # logger
@@ -169,7 +187,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
         policy.set_eps(eps)
         if args.reward_distribution and epoch%200==0:
         # 保存buffer中的reward值
-            reward_distribution_path = os.path.join("log", "reward_distribution", args.task, "baseline")
+            reward_distribution_path = os.path.join("log", "reward_distribution", args.task, "baseline_per_")
             os.makedirs(reward_distribution_path, exist_ok=True)
             
             # 获取buffer中的所有reward
@@ -178,42 +196,14 @@ def main(args: argparse.Namespace = get_args()) -> None:
             # 将reward保存到文件中
             np.save(os.path.join(reward_distribution_path, f"rewards_epoch_{epoch}.npy"), rewards)
 
-        
+    def compute_reward_fn(ag: np.ndarray, g: np.ndarray) -> np.ndarray:
+        return env.compute_reward(ag, g, {})    
 
     def test_fn(epoch: int, env_step: int | None) -> None:
         policy.set_eps(args.eps_test)
 
     def save_checkpoint_fn(epoch: int, env_step: int, gradient_step: int) -> str:
         pass
-
-    # watch agent's performance
-    def watch() -> None:
-        print("Setup test envs ...")
-        policy.set_eps(args.eps_test)
-        test_envs.seed(args.seed)
-        if args.save_buffer_name:
-            print(f"Generate buffer with size {args.buffer_size}")
-            buffer = VectorReplayBuffer(
-                args.buffer_size,
-                buffer_num=len(test_envs),
-                ignore_obs_next=True,
-                save_only_last_obs=True,
-                stack_num=args.frames_stack,
-            )
-            collector = Collector[CollectStats](policy, test_envs, buffer, exploration_noise=True)
-            result = collector.collect(n_step=args.buffer_size)
-            print(f"Save buffer into {args.save_buffer_name}")
-            # Unfortunately, pickle will cause oom with 1M buffer size
-            buffer.save_hdf5(args.save_buffer_name)
-        else:
-            print("Testing agent ...")
-            test_collector.reset()
-            result = test_collector.collect(n_episode=args.test_num, render=args.render)
-        result.pprint_asdict()
-
-    if args.watch:
-        watch()
-        sys.exit(0)
 
 
     # trainer
@@ -239,7 +229,6 @@ def main(args: argparse.Namespace = get_args()) -> None:
     ).run()
 
     pprint.pprint(result)
-    watch()
 
 
 if __name__ == "__main__":

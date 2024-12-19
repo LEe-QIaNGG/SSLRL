@@ -5,7 +5,8 @@ from scipy.stats import gaussian_kde
 from scipy.interpolate import make_interp_spline
 from mpl_toolkits.mplot3d import Axes3D
 
-source_path = 'draw/draw_source/reward_distribution/Hero-ram-v4/baseline/'
+type='baseline'
+source_path = f'draw/draw_source/reward_distribution/Hero-ram-v4/{type}/'
 npy_files = sorted([f for f in os.listdir(source_path) if f.endswith('.npy')])
 def smooth_frequency(frequency, factor=0.5):
     return frequency ** factor  # 平方根缩放，将 factor 设为 0.5
@@ -42,12 +43,13 @@ for i, (rewards, counts) in enumerate(reward_counts_per_epoch):
              label=f"Epoch {(i+1)*200}", alpha=0.5)
 
 # 添加标签和标题
-ax.set_xlabel("log(Reward Value)")
-ax.set_ylabel("Epoch")
-ax.set_zlabel("Normalized Frequency")
-ax.set_title("3D Distribution of Rewards Over Epochs")
-ax.legend()
+ax.set_xlabel("log(Reward Value)", fontsize=18)
+ax.set_ylabel("Epoch", fontsize=18)
+ax.set_zlabel("Normalized Frequency", fontsize=18)
+# ax.set_title("3D Distribution of Rewards Over Epochs")
+ax.legend(fontsize=15)
 
-plt.savefig(source_path+'reward_distribution_3d.eps')
+plt.tight_layout() # 减少图片边缘的空白
+plt.savefig(source_path+f'reward_distribution_3d_{type}.png') # bbox_inches='tight'会自动调整以减少空白
 
 
