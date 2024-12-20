@@ -21,3 +21,5 @@ python baseline.py --task Venture-ram-v4 --logdir log
 pip install pytorch-lightning -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 python ./RCP/trainer.py --implementation RCP --gamename MontezumaRevenge-ram-v4 --exp_name debug --num_workers 1 --seed 25
+
+

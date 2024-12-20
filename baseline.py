@@ -88,7 +88,7 @@ def get_args() -> argparse.Namespace:
         default=0.2,
         help="weight for the forward model loss in ICM",
     )
-    parser.add_argument("--reward-distribution", type=bool, default=True)
+    parser.add_argument("--reward-distribution", type=bool, default=False)
     return parser.parse_args()
 
 
