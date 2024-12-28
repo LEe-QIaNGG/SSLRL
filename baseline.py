@@ -5,6 +5,8 @@ import os
 import pprint
 import sys
 import gymnasium as gym 
+import gymnasium_robotics
+from gymnasium import spaces
 
 import numpy as np
 
@@ -13,8 +15,10 @@ from tianshou.utils.net.common import Net
 from gymnasium.spaces import Box, Discrete, MultiBinary, MultiDiscrete
 
 import tianshou as ts
+from tianshou.env import ShmemVectorEnv, TruncatedAsTerminated
 from tianshou.data import Collector, CollectStats, VectorReplayBuffer,PrioritizedReplayBuffer,HERReplayBuffer
 from tianshou.highlevel.logger import LoggerFactoryDefault
+from tianshou.env import SubprocVectorEnv
 from tianshou.utils.logger.tensorboard import TensorboardLogger
 from torch.utils.tensorboard import SummaryWriter
 from tianshou.policy import DQNPolicy
@@ -22,12 +26,14 @@ from tianshou.policy.base import BasePolicy
 from tianshou.policy.modelbased.icm import ICMPolicy
 from tianshou.trainer import OffpolicyTrainer
 from tianshou.utils.net.discrete import IntrinsicCuriosityModule
+from tianshou.env.venvs import BaseVectorEnv
+from tianshou.utils.space_info import ActionSpaceInfo
 from tianshou.utils.space_info import SpaceInfo
 
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", type=str, default="Pitfall-ram-v4")
+    parser.add_argument("--task", type=str, default="FetchReach-v3")
     parser.add_argument("--buffer-type",type=str,default='per')
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--scale-obs", type=int, default=0)
@@ -92,27 +98,98 @@ def get_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+# 自定义 Wrapper，用于展平 observation
+class FlattenObservation(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        obs_space = env.observation_space
+        # 提取原始 observation_space 的低维和高维信息
+        flat_dim = np.prod(obs_space["observation"].shape) + \
+                   np.prod(obs_space["achieved_goal"].shape) + \
+                   np.prod(obs_space["desired_goal"].shape)
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=(flat_dim,), dtype=np.float32
+        )
+
+    def observation(self, observation):
+        # 将字典形式的 observation 展平为数组
+        return np.concatenate([
+            observation["observation"],
+            observation["achieved_goal"],
+            observation["desired_goal"]
+        ])
+
+# 创建离散化后的 FetchReach 环境，并展平 observation
+class DiscretizedFetchReachEnv(gym.Wrapper):
+    def __init__(self, env, n=3):
+        super().__init__(FlattenObservation(env))
+        self.n = n
+        self.action_space = gym.spaces.Discrete(n**3)
+        self._discrete_actions = self._create_discrete_actions(n)
+
+    def _create_discrete_actions(self, n):
+        actions = []
+        for dx in np.linspace(-1, 1, n):
+            for dy in np.linspace(-1, 1, n):
+                for dz in np.linspace(-1, 1, n):
+                    # 添加抓取动作（grip）为0
+                    actions.append([dx, dy, dz, 0.0])  # 添加第四个维度
+        return np.array(actions)
+
+    def step(self, action):
+        continuous_action = self._discrete_actions[action]
+        obs, reward, done, truncated, info = self.env.step(continuous_action)
+        return obs, reward, done, truncated, info
+
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
+
+# 创建离散化后的 FetchReach 环境
+def make_fetchreach_env(n_envs=1, n_discretize=3):
+    def _make_env():
+        return DiscretizedFetchReachEnv(gym.make("FetchReach-v3"), n=n_discretize)
+    return SubprocVectorEnv([_make_env for _ in range(n_envs)])
+
+def make_fetch_env(
+    task: str,
+    training_num: int,
+    test_num: int,
+) -> tuple[gym.Env, BaseVectorEnv, BaseVectorEnv]:
+    env = TruncatedAsTerminated(gym.make(task))
+    train_envs = ShmemVectorEnv(
+        [lambda: TruncatedAsTerminated(gym.make(task)) for _ in range(training_num)],
+    )
+    test_envs = ShmemVectorEnv(
+        [lambda: TruncatedAsTerminated(gym.make(task)) for _ in range(test_num)],
+    )
+    return env, train_envs, test_envs
+
 def main(args: argparse.Namespace = get_args()) -> None:
-
     env = gym.make(args.task)
-    train_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.training_num)])
-    test_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.test_num)])
-
-    args.state_shape = env.observation_space.shape or env.observation_space.n
-    args.action_shape = env.action_space.shape or env.action_space.n
-    # should be N_FRAMES x H x W
-    print("Observations shape:", args.state_shape)
-    print("Actions shape:", args.action_shape)
-    assert isinstance(env.action_space, Discrete)
+    def compute_reward_fn(ag: np.ndarray, g: np.ndarray) -> np.ndarray:
+        return env.compute_reward(ag, g, {})
+    if args.task=="FetchReach-v3":
+        train_envs = DiscretizedFetchReachEnv(gym.make("FetchReach-v3"), n=3)
+        test_envs = DiscretizedFetchReachEnv(gym.make("FetchReach-v3"), n=3)
+        state_shape = train_envs.observation_space.shape[0]  # 使用包装后的环境的观察空间维度
+        action_shape = train_envs.action_space.n
+    else:
+        train_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.training_num)])
+        test_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.test_num)])
+        args.state_shape = env.observation_space.shape #or env.observation_space.n
+        args.action_shape = env.action_space.shape or env.action_space.n
+        space_info = SpaceInfo.from_env(env)
+        state_shape = space_info.observation_info.obs_shape
+        action_shape = space_info.action_info.action_shape
+        print("Observations shape:", args.state_shape)
+        print("Actions shape:", args.action_shape)
     # seed
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    # define model
-    # net = DQN(*args.state_shape, action_shape=args.action_shape, device=args.device).to(args.device)
-    space_info = SpaceInfo.from_env(env)
-    state_shape = space_info.observation_info.obs_shape
-    action_shape = space_info.action_info.action_shape
-    net = Net(state_shape=state_shape, action_shape=action_shape, hidden_sizes=[128, 128, 128],device=args.device)
+        # 离散动作空间
+    net = Net(state_shape=state_shape, action_shape=action_shape, hidden_sizes=[128, 128, 128], device=args.device)
+
+        
     optim = torch.optim.Adam(net.parameters(), lr=args.lr)
 
     # define policy
@@ -153,14 +230,13 @@ def main(args: argparse.Namespace = get_args()) -> None:
         )
 
 
-    # collector
+
     train_collector = Collector[CollectStats](policy, train_envs, buffer, exploration_noise=True)
     test_collector = Collector[CollectStats](policy, test_envs, exploration_noise=True)
-
     # log
     now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
     args.algo_name = "dqn_icm" if args.icm_lr_scale > 0 else "dqn"
-    log_name = os.path.join(args.task, 'framework_test', 'baseline_per_'+ now)
+    log_name = os.path.join(args.task, 'framework_test', 'baseline_'+args.buffer_type+'_'+ now)
     log_path = os.path.join(args.logdir, log_name)
 
     # logger
@@ -180,8 +256,8 @@ def main(args: argparse.Namespace = get_args()) -> None:
         # nature DQN setting, linear decay in the first 1M steps
         # env_step就是每个epoch的step,这里一个epoch执行200次，
         num_steps=args.step_per_epoch*args.epoch
-        if env_step <= 1e6:
-            eps = args.eps_train - env_step / 1e6 * (args.eps_train - args.eps_train_final)
+        if env_step <= num_steps:
+            eps = args.eps_train - env_step / num_steps * (args.eps_train - args.eps_train_final)
         else:
             eps = args.eps_train_final
         policy.set_eps(eps)

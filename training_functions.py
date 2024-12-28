@@ -10,10 +10,15 @@ from data_augmentation import (
 )
     
 class Reward_Estimator:
-    def __init__(self,args, act_dim=1,network_type='FCNet'):
+    def __init__(self,args,flat_state_shape, act_dim=1,network_type='FCNet'):
         '''要求环境的action是discrete,reward是discrete
         '''
-        self.obs_dim = args.state_shape[0]
+        if flat_state_shape is None:
+            self.obs_dim = args.state_shape[0]
+            self.type="Atari"
+        else:
+            self.obs_dim=flat_state_shape
+            self.type="Robotics"
         self.act_dim = act_dim
         self.num_reward = 12
         if network_type == 'ResNet':
@@ -32,13 +37,53 @@ class Reward_Estimator:
         self.is_L2=args.is_L2
         self.is_store=args.is_store
         self.task=args.task
+        self.num_iter=args.epoch*args.step_per_epoch*args.update_per_step
 
     def get_input_data(self, buffer, mask_nonzero):
-        obs = torch.tensor(buffer.obs[mask_nonzero], device=self.device)
-        action = torch.tensor(buffer.act[mask_nonzero], device=self.device)
-        next_obs = torch.tensor(buffer.obs_next[mask_nonzero], device=self.device)
-        action = action.unsqueeze(1)  # 添加这一行
-        return torch.cat([obs, next_obs, action], dim=-1).float()
+        if mask_nonzero is None:
+            # 如果mask为None,取出所有数据
+            if self.type=="Robotics":
+                obs_dict = buffer.obs
+                obs = torch.cat([
+                    torch.tensor(obs_dict['observation'], device=self.device),
+                    torch.tensor(obs_dict['desired_goal'], device=self.device), 
+                    torch.tensor(obs_dict['achieved_goal'], device=self.device)
+                ], dim=1)
+                
+                next_obs_dict = buffer.obs_next
+                next_obs = torch.cat([
+                    torch.tensor(next_obs_dict['observation'], device=self.device),
+                    torch.tensor(next_obs_dict['desired_goal'], device=self.device),
+                    torch.tensor(next_obs_dict['achieved_goal'], device=self.device) 
+                ], dim=1)
+            else:
+                obs = torch.tensor(buffer.obs, device=self.device)
+                next_obs = torch.tensor(buffer.obs_next, device=self.device)
+                
+            action = torch.tensor(buffer.act, device=self.device)
+        else:
+            # 使用mask取出部分数据
+            if self.type=="Robotics":
+                obs_dict = buffer.obs[mask_nonzero]
+                obs = torch.cat([
+                    torch.tensor(obs_dict['observation'], device=self.device),
+                    torch.tensor(obs_dict['desired_goal'], device=self.device), 
+                    torch.tensor(obs_dict['achieved_goal'], device=self.device)
+                ], dim=1)
+                
+                next_obs_dict = buffer.obs_next[mask_nonzero]
+                next_obs = torch.cat([
+                    torch.tensor(next_obs_dict['observation'], device=self.device),
+                    torch.tensor(next_obs_dict['desired_goal'], device=self.device),
+                    torch.tensor(next_obs_dict['achieved_goal'], device=self.device) 
+                ], dim=1)
+            else:
+                obs = torch.tensor(buffer.obs[mask_nonzero], device=self.device)
+                next_obs = torch.tensor(buffer.obs_next[mask_nonzero], device=self.device)
+                
+            action = torch.tensor(buffer.act[mask_nonzero], device=self.device)
+        
+        return torch.cat([obs, next_obs, action], dim=1).float()
     
     def calculate_mask(self, buffer):
         reward_list=np.array(self.true_reward[self.true_reward != 0])
@@ -111,13 +156,14 @@ class Reward_Estimator:
             print('\nreward list:', self.reward_list)
             print('\ntrue reward:', self.true_reward)
 
-    def update_reward(self, buffer,iter,alpha,num_iter=200000):
+    def update_reward(self, buffer,iter,alpha):
+        num_iter=self.num_iter
         # 获取buffer中的obs、obs_next和act
-        obs = torch.tensor(buffer.obs)
-        obs_next = torch.tensor(buffer.obs_next)
-        act = torch.tensor(buffer.act).unsqueeze(-1)
-        input_data = torch.cat([obs, obs_next, act], dim=-1).float().to(self.device)
-        
+        # obs = torch.tensor(buffer.obs)
+        # obs_next = torch.tensor(buffer.obs_next)
+        # act = torch.tensor(buffer.act).unsqueeze(-1)
+        # input_data = torch.cat([obs, obs_next, act], dim=-1).float().to(self.device)
+        input_data=self.get_input_data(buffer,None)
         # 对于buffer中reward不等于true_reward里的值的项
         mask = self.calculate_mask(buffer)
 
@@ -163,24 +209,24 @@ class Reward_Estimator:
                 #         np.save(mask_file, mask)
                 #         np.save(update_mask_file, update_mask)
                 #         np.save(new_rewards_file, new_rewards.numpy())
-                if iter>190000 and self.is_store:
-                    buffer_log_path = os.path.join("log", "buffer",self.task,str(self.is_L2))
-                    os.makedirs(buffer_log_path, exist_ok=True)
-                    obs_file = os.path.join(buffer_log_path, f"obs.npy")
-                    if not os.path.exists(obs_file):    
-                        action_file = os.path.join(buffer_log_path, f"action.npy")
-                        obs_next_file = os.path.join(buffer_log_path, f"obs_next.npy")
-                        rew_file = os.path.join(buffer_log_path, f"rew.npy")
-                        mask_file = os.path.join(buffer_log_path, f"mask.npy")
-                        update_mask_file = os.path.join(buffer_log_path, f"update_mask.npy")
-                        new_rewards_file = os.path.join(buffer_log_path, f"new_rewards.npy")
-                        np.save(obs_file, buffer.obs)
-                        np.save(action_file, buffer.act)
-                        np.save(obs_next_file, buffer.obs_next)
-                        np.save(rew_file, buffer.rew)
-                        np.save(mask_file, mask)
-                        np.save(update_mask_file, update_mask)  
-                        np.save(new_rewards_file, new_rewards.numpy())
+                # if iter>190000 and self.is_store:
+                #     buffer_log_path = os.path.join("log", "buffer",self.task,str(self.is_L2))
+                #     os.makedirs(buffer_log_path, exist_ok=True)
+                #     obs_file = os.path.join(buffer_log_path, f"obs.npy")
+                #     if not os.path.exists(obs_file):    
+                #         action_file = os.path.join(buffer_log_path, f"action.npy")
+                #         obs_next_file = os.path.join(buffer_log_path, f"obs_next.npy")
+                #         rew_file = os.path.join(buffer_log_path, f"rew.npy")
+                #         mask_file = os.path.join(buffer_log_path, f"mask.npy")
+                #         update_mask_file = os.path.join(buffer_log_path, f"update_mask.npy")
+                #         new_rewards_file = os.path.join(buffer_log_path, f"new_rewards.npy")
+                #         np.save(obs_file, buffer.obs)
+                #         np.save(action_file, buffer.act)
+                #         np.save(obs_next_file, buffer.obs_next)
+                #         np.save(rew_file, buffer.rew)
+                #         np.save(mask_file, mask)
+                #         np.save(update_mask_file, update_mask)  
+                #         np.save(new_rewards_file, new_rewards.numpy())
                     
 
 
@@ -197,11 +243,13 @@ class Reward_Estimator:
             batch_rew = torch.tensor(batch.rew)
             self.update_true_reward(batch_rew)
             if not torch.all(batch_rew == 0):
+                # print("update non-zero reward")
                 self.update_network(batch, alpha)
                 update_flag = True
         
         if update_flag:
             self.update_reward(buffer,iter,alpha)
+            # print("reward updated")
 
 
         

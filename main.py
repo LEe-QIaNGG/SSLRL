@@ -99,7 +99,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--is_store",
         type=bool,
-        default=True,
+        default=False,
         help="buffer,reward distribution",
     )
     parser.add_argument(
@@ -140,6 +140,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
         estimation_step=args.n_step,#  n step  DQN
         target_update_freq=args.target_update_freq,
         reward_estimator=reward_estimator,
+        args=args
     ).to(args.device)
 
     # load a previous policy
