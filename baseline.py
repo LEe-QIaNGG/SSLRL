@@ -45,7 +45,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--n-step", type=int, default=3)
     parser.add_argument("--target-update-freq", type=int, default=400)
-    parser.add_argument("--epoch", type=int, default=1000)
+    parser.add_argument("--epoch", type=int, default=2000)
     parser.add_argument("--step-per-epoch", type=int, default=2000)
     parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
@@ -207,7 +207,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
         policy.load_state_dict(torch.load(args.resume_path, map_location=args.device))
         print("Loaded agent from: ", args.resume_path)
 
-    if args.buffer_type == "vector":
+    if args.buffer_type == "normal":
         buffer = VectorReplayBuffer(
             args.buffer_size,
             buffer_num=args.training_num,
@@ -236,7 +236,7 @@ def main(args: argparse.Namespace = get_args()) -> None:
     # log
     now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
     args.algo_name = "dqn_icm" if args.icm_lr_scale > 0 else "dqn"
-    log_name = os.path.join(args.task, 'framework_test', 'baseline_'+args.buffer_type+'_'+ now)
+    log_name = os.path.join(args.task, 'baseline_'+args.buffer_type+'_'+ now)
     log_path = os.path.join(args.logdir, log_name)
 
     # logger
@@ -272,8 +272,6 @@ def main(args: argparse.Namespace = get_args()) -> None:
             # 将reward保存到文件中
             np.save(os.path.join(reward_distribution_path, f"rewards_epoch_{epoch}.npy"), rewards)
 
-    def compute_reward_fn(ag: np.ndarray, g: np.ndarray) -> np.ndarray:
-        return env.compute_reward(ag, g, {})    
 
     def test_fn(epoch: int, env_step: int | None) -> None:
         policy.set_eps(args.eps_test)

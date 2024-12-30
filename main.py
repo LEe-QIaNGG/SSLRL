@@ -4,11 +4,13 @@ import os
 import pprint
 import sys
 import gymnasium as gym 
+import gymnasium_robotics
 
 import numpy as np
 import torch
 from tianshou.utils.net.common import Net
 from gymnasium.spaces import Box, Discrete, MultiBinary, MultiDiscrete
+from robotics_test import make_fetch_env
 
 import tianshou as ts
 from tianshou.data import Collector, CollectStats    , VectorReplayBuffer
@@ -20,6 +22,7 @@ from tianshou.policy.base import BasePolicy
 from tianshou.trainer import OffpolicyTrainer
 from tianshou.utils.space_info import SpaceInfo
 from training_functions import Reward_Estimator
+from tianshou.utils.space_info import ActionSpaceInfo
 
 
 def get_args() -> argparse.Namespace:
@@ -35,7 +38,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--n-step", type=int, default=3)
     parser.add_argument("--target-update-freq", type=int, default=400)
-    parser.add_argument("--epoch", type=int, default=1000)
+    parser.add_argument("--epoch", type=int, default=2000)
     parser.add_argument("--step-per-epoch", type=int, default=2000)
     parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
@@ -112,12 +115,23 @@ def get_args() -> argparse.Namespace:
 
 
 def main(args: argparse.Namespace = get_args()) -> None:
-    env = gym.make(args.task)
-    train_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.training_num)])
-    test_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.test_num)])
+    if args.task=="FetchReach-v3":
+        env, train_envs, test_envs = make_fetch_env(args.task, args.training_num, args.test_num)
+        args.state_shape = {
+        "observation": env.observation_space["observation"].shape,
+        "achieved_goal": env.observation_space["achieved_goal"].shape,
+        "desired_goal": env.observation_space["desired_goal"].shape,
+    }
+        action_info = ActionSpaceInfo.from_space(env.action_space)
+        args.action_shape = action_info.action_shape
+        args.max_action = action_info.max_action       
+    else:
+        env = gym.make(args.task)
+        train_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.training_num)])
+        test_envs = ts.env.DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.test_num)])
 
-    args.state_shape = env.observation_space.shape or env.observation_space.n
-    args.action_shape = env.action_space.shape or env.action_space.n
+        args.state_shape = env.observation_space.shape or env.observation_space.n
+        args.action_shape = env.action_space.shape or env.action_space.n
     # should be N_FRAMES x H x W
     print("Observations shape:", args.state_shape)
     print("Actions shape:", args.action_shape)

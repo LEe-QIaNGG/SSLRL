@@ -42,17 +42,17 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--tau", type=float, default=0.005)
     parser.add_argument("--exploration-noise", type=float, default=0.1)
-    parser.add_argument("--start-timesteps", type=int, default=25000)
+    parser.add_argument("--start-timesteps", type=int, default=20000)
     parser.add_argument("--epoch", type=int, default=10)
     parser.add_argument("--step-per-epoch", type=int, default=5000)
-    parser.add_argument("--step-per-collect", type=int, default=1)
-    parser.add_argument("--update-per-step", type=int, default=0.1)
-    parser.add_argument("--n-step", type=int, default=1)
+    parser.add_argument("--step-per-collect", type=int, default=10)
+    parser.add_argument("--update-per-step", type=int, default=0.1)#每个step update几次
+    parser.add_argument("--n-step", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--replay-buffer", type=str, default="normal", choices=["normal", "her","per"])
     parser.add_argument("--her-horizon", type=int, default=50)
     parser.add_argument("--her-future-k", type=int, default=8)
-    parser.add_argument("--training-num", type=int, default=1)
+    parser.add_argument("--training-num", type=int, default=2)
     parser.add_argument("--test-num", type=int, default=10)
     parser.add_argument("--logdir", type=str, default="log_test")
     parser.add_argument("--render", type=float, default=0.0)
@@ -116,7 +116,7 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
     # log
     now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
     args.algo_name = "ddpg"
-    log_name = os.path.join(args.task, args.algo_name, str(args.seed), now)
+    log_name = os.path.join(args.task, args.replay_buffer+now)
     log_path = os.path.join(args.logdir, log_name)
 
     # logger

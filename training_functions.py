@@ -31,7 +31,7 @@ class Reward_Estimator:
         self.optim_V= torch.optim.Adam(self.Vnet.parameters(), lr=1e-3)
         self.reward_list = [0] * self.num_reward
         self.true_reward=[0]
-        self.threshold=0.7
+        self.threshold=0.9
         self.device=args.device
         self.data_augmentation=args.data_augmentation
         self.is_L2=args.is_L2
@@ -171,14 +171,14 @@ class Reward_Estimator:
         #     print('真实reward的数量:', np.sum(~mask))
         num_real_reward=np.sum(~mask)
         mask = torch.from_numpy(mask)
-        if num_real_reward<50:
-            update_prob=0.01
-        else:
-            if iter<num_iter/3:
-                update_prob=min(10*num_real_reward/len(mask),0.1)
-            else:
-                update_prob=min(8*num_real_reward/len(mask),0.1)
-        mask = torch.where(torch.rand_like(mask.float()) < update_prob, mask, torch.zeros_like(mask,dtype=torch.bool))
+        # if num_real_reward<50:
+        #     update_prob=0.01
+        # else:
+        #     if iter<num_iter/3:
+        #         update_prob=min(10*num_real_reward/len(mask),0.1)
+        #     else:
+        #         update_prob=min(8*num_real_reward/len(mask),0.1)
+        # mask = torch.where(torch.rand_like(mask.float()) < update_prob, mask, torch.zeros_like(mask,dtype=torch.bool))
         #mask buffer_size
 
         if torch.any(mask):
@@ -266,7 +266,8 @@ class Reward_Estimator:
         
         # 使用obs_next作为Vnet的输入
         V_confidence_next = self.Vnet(obs_next)
-        total_confidence = (Q_confidence + V_confidence_next)/2
+        beta=0.5
+        total_confidence = (beta*Q_confidence + (1-beta)*V_confidence_next)
 
         #计算L2
         if is_L2:
