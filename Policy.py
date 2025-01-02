@@ -294,7 +294,7 @@ class DDPGTrainingStats(TrainingStats):
 TDDPGTrainingStats = TypeVar("TDDPGTrainingStats", bound=DDPGTrainingStats)
 
 
-class DDPGPolicy(BasePolicy[TDDPGTrainingStats], Generic[TDDPGTrainingStats]):
+class CusDDPGPolicy(BasePolicy[TDDPGTrainingStats], Generic[TDDPGTrainingStats]):
     """Implementation of Deep Deterministic Policy Gradient. arXiv:1509.02971.
 
     :param actor: The actor network following the rules (s -> actions)

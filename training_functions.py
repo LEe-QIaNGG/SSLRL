@@ -38,6 +38,8 @@ class Reward_Estimator:
         self.is_store=args.is_store
         self.task=args.task
         self.num_iter=args.epoch*args.step_per_epoch*args.update_per_step
+        self.update_num=[]
+        self.nonzero_num=[]
 
     def get_input_data(self, buffer, mask_nonzero):
         if mask_nonzero is None:
@@ -157,7 +159,7 @@ class Reward_Estimator:
             print('\ntrue reward:', self.true_reward)
 
     def update_reward(self, buffer,iter,alpha):
-        num_iter=self.num_iter
+        num_iter=self.num_iter 
         # 获取buffer中的obs、obs_next和act
         # obs = torch.tensor(buffer.obs)
         # obs_next = torch.tensor(buffer.obs_next)
@@ -170,6 +172,7 @@ class Reward_Estimator:
         # if iter%100 == 0:
         #     print('真实reward的数量:', np.sum(~mask))
         num_real_reward=np.sum(~mask)
+        self.nonzero_num.append(num_real_reward)
         mask = torch.from_numpy(mask)
         # if num_real_reward<50:
         #     update_prob=0.01
@@ -192,6 +195,7 @@ class Reward_Estimator:
                 
             # 更新满足条件的奖励
             update_mask = max_confidence > self.threshold
+            self.update_num.append(int(sum(update_mask)))
             if sum(update_mask)>1:
                 new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
                 buffer.rew[mask][update_mask] = new_rewards.numpy()
@@ -227,7 +231,22 @@ class Reward_Estimator:
                 #         np.save(mask_file, mask)
                 #         np.save(update_mask_file, update_mask)  
                 #         np.save(new_rewards_file, new_rewards.numpy())
-                    
+        else:
+            self.update_num.append(0)
+
+        self.set_threshold(iter)
+        
+        if iter%1000==0:
+            update_num_path = os.path.join("log", "monitor","update_num")
+            nonzero_num_path = os.path.join("log", "monitor","nonzero_num")
+            os.makedirs(update_num_path, exist_ok=True)
+            update_num_file = os.path.join(update_num_path, f"update_num.npy")
+            np.save(update_num_file, self.update_num)
+            os.makedirs(nonzero_num_path, exist_ok=True)
+            nonzero_num_file = os.path.join(nonzero_num_path, f"nonzero_num.npy")
+            np.save(nonzero_num_file, self.nonzero_num)
+
+            
 
 
         
@@ -301,4 +320,8 @@ class Reward_Estimator:
         
         return L2
 
+    def set_threshold(self,iter):
+        # 随着iter增大,threshold从0.8逐渐增加到0.95
+        self.threshold = 0.8 + 0.19 * (1 - np.exp(-iter / self.num_iter))
+        
 

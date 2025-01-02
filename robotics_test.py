@@ -21,9 +21,11 @@ from tianshou.data import (
 from tianshou.highlevel.logger import LoggerFactoryDefault
 from tianshou.env import ShmemVectorEnv, TruncatedAsTerminated
 from tianshou.exploration import GaussianNoise
-from Policy import DDPGPolicy
-# from tianshou.policy import DDPGPolicy
+from Policy import CusDDPGPolicy
+from tianshou.policy import DDPGPolicy
 from tianshou.policy.base import BasePolicy
+from tianshou.policy.modelbased.icm import ICMPolicy
+from tianshou.utils.net.discrete import IntrinsicCuriosityModule
 from tianshou.trainer import OffpolicyTrainer
 from tianshou.utils.net.common import Net, get_dict_state_decorator
 from tianshou.utils.net.continuous import Actor, Critic
@@ -52,8 +54,8 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--replay-buffer", type=str, default="normal", choices=["normal", "her","per"])
     parser.add_argument("--her-horizon", type=int, default=50)
     parser.add_argument("--her-future-k", type=int, default=8)
-    parser.add_argument("--training-num", type=int, default=2)
-    parser.add_argument("--test-num", type=int, default=10)
+    parser.add_argument("--training-num", type=int, default=1)
+    parser.add_argument("--test-num", type=int, default=1)
     parser.add_argument("--logdir", type=str, default="log_test")
     parser.add_argument("--render", type=float, default=0.0)
     parser.add_argument(
@@ -94,6 +96,24 @@ def get_args() -> argparse.Namespace:
         default=False,
         help="buffer,reward distribution",
     )
+    parser.add_argument(
+        "--icm-lr-scale",
+        type=float,
+        default=0.2,
+        help="use intrinsic curiosity module with this lr scale",
+    )
+    parser.add_argument(
+        "--icm-reward-scale",
+        type=float,
+        default=0.01,
+        help="scaling factor for intrinsic curiosity reward",
+    )
+    parser.add_argument(
+        "--icm-forward-loss-weight",
+        type=float,
+        default=0.2,
+        help="weight for the forward model loss in ICM",
+    )
     return parser.parse_args()
 
 
@@ -107,7 +127,7 @@ def make_fetch_env(
         [lambda: TruncatedAsTerminated(gym.make(task)) for _ in range(training_num)],
     )
     test_envs = ShmemVectorEnv(
-        [lambda: TruncatedAsTerminated(gym.make(task)) for _ in range(test_num)],
+        [lambda: TruncatedAsTerminated(gym.make(task, render_mode='rgb_array')) for _ in range(test_num)],
     )
     return env, train_envs, test_envs
 
@@ -116,7 +136,10 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
     # log
     now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
     args.algo_name = "ddpg"
-    log_name = os.path.join(args.task, args.replay_buffer+now)
+    if args.icm_lr_scale <= 0:
+        log_name = os.path.join(args.task, args.replay_buffer+now)
+    else:
+        log_name = os.path.join(args.task, "icm"+now)
     log_path = os.path.join(args.logdir, log_name)
 
     # logger
@@ -135,16 +158,10 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
     )
 
     env, train_envs, test_envs = make_fetch_env(args.task, args.training_num, args.test_num)
-    # The method HER works with goal-based environments
     if not isinstance(env.observation_space, gym.spaces.Dict):
         raise ValueError(
             "`env.observation_space` must be of type `gym.spaces.Dict`. Make sure you're using a goal-based environment like `FetchReach-v2`.",
         )
-    # if not hasattr(env, "compute_reward"):
-    #     raise ValueError(
-    #         "Atrribute `compute_reward` not found in `env`. "
-    #         "HER-based algorithms typically require this attribute. Make sure you're using a goal-based environment like `FetchReach-v2`.",
-    #     )
     args.state_shape = {
         "observation": env.observation_space["observation"].shape,
         "achieved_goal": env.observation_space["achieved_goal"].shape,
@@ -188,31 +205,73 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
     critic = dict_state_dec(Critic)(net_c, device=args.device).to(args.device)
     critic_optim = torch.optim.Adam(critic.parameters(), lr=args.critic_lr)
 
-    reward_estimator=Reward_Estimator(args,flat_state_shape)
-    policy: DDPGPolicy = DDPGPolicy(
-        actor=actor,
-        actor_optim=actor_optim,
-        critic=critic,
-        critic_optim=critic_optim,
-        tau=args.tau,
-        gamma=args.gamma,
-        exploration_noise=GaussianNoise(sigma=args.exploration_noise),
-        estimation_step=args.n_step,
-        action_space=env.action_space,
-        reward_estimator=reward_estimator,
-        args=args
-    )
-    # policy: DDPGPolicy = DDPGPolicy(
-    #     actor=actor,
-    #     actor_optim=actor_optim,
-    #     critic=critic,
-    #     critic_optim=critic_optim,
-    #     tau=args.tau,
-    #     gamma=args.gamma,
-    #     exploration_noise=GaussianNoise(sigma=args.exploration_noise),
-    #     estimation_step=args.n_step,
-    #     action_space=env.action_space,
-    # )
+    # 确定使用哪个 DDPG Policy
+    use_custom_policy = args.replay_buffer == "normal" and args.icm_lr_scale <= 0
+    
+    if use_custom_policy:
+        print('use SSRS')
+        reward_estimator = Reward_Estimator(args, flat_state_shape)
+        base_policy: DDPGPolicy = CusDDPGPolicy(
+            actor=actor,
+            actor_optim=actor_optim,
+            critic=critic,
+            critic_optim=critic_optim,
+            tau=args.tau,
+            gamma=args.gamma,
+            exploration_noise=GaussianNoise(sigma=args.exploration_noise),
+            estimation_step=args.n_step,
+            action_space=env.action_space,
+            reward_estimator=reward_estimator,
+            args=args
+        )
+    else:
+        base_policy: DDPGPolicy = DDPGPolicy(
+            actor=actor,
+            actor_optim=actor_optim,
+            critic=critic,
+            critic_optim=critic_optim,
+            tau=args.tau,
+            gamma=args.gamma,
+            exploration_noise=GaussianNoise(sigma=args.exploration_noise),
+            estimation_step=args.n_step,
+            action_space=env.action_space
+        )
+
+    # 如果启用ICM，创建ICM策略
+    if args.icm_lr_scale > 0:
+        print('use ICM')
+        # 创建特征网络
+        feature_net = dict_state_dec(Net)(
+            flat_state_shape,
+            hidden_sizes=args.hidden_sizes,
+            device=args.device,
+        )
+        action_dim = np.prod(args.action_shape)
+        feature_dim = args.hidden_sizes[-1]  # 使用最后一层隐藏层大小作为特征维度
+        
+        # 创建ICM网络
+        icm_net = IntrinsicCuriosityModule(
+            feature_net,
+            feature_dim,
+            action_dim,
+            hidden_sizes=[512],
+            device=args.device,
+        )
+        icm_optim = torch.optim.Adam(icm_net.parameters(), lr=args.icm_lr_scale)
+        
+        # 包装成ICM策略
+        policy = ICMPolicy(
+            policy=base_policy,
+            model=icm_net,
+            optim=icm_optim,
+            action_space=env.action_space,
+            lr_scale=args.icm_lr_scale,
+            reward_scale=args.icm_reward_scale,
+            forward_loss_weight=args.icm_forward_loss_weight,
+        ).to(args.device)
+    else:
+        policy = base_policy
+
     # load a previous policy
     if args.resume_path:
         policy.load_state_dict(torch.load(args.resume_path, map_location=args.device))
@@ -234,6 +293,7 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
         else:
             buffer = ReplayBuffer(args.buffer_size)
     elif args.replay_buffer== "per":
+            print('use per')
             buffer = PrioritizedReplayBuffer(
             size=args.buffer_size,
             alpha=0.6, beta=0.4,
@@ -241,6 +301,7 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
             ignore_obs_next=True,
         )
     else:
+        print('use her')
         if args.training_num > 1:
             buffer = HERVectorReplayBuffer(
                 args.buffer_size,
@@ -257,6 +318,7 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
                 future_k=args.her_future_k,
             )
     train_collector = Collector[CollectStats](policy, train_envs, buffer, exploration_noise=True)
+    # test_envs.render(mode='rgb_array')
     test_collector = Collector[CollectStats](policy, test_envs)
     # train_collector.reset()
     # train_collector.collect(n_step=args.start_timesteps, random=True)
@@ -282,7 +344,8 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
         ).run()
         pprint.pprint(result)
 
-    # Let's watch its performance!
+    policy.eval()
+    # policy.set_eps(eps_test=0.9)
     test_envs.seed(args.seed)
     test_collector.reset()
     collector_stats = test_collector.collect(n_episode=args.test_num, render=args.render)
