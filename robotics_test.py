@@ -21,17 +21,17 @@ from tianshou.data import (
 from tianshou.highlevel.logger import LoggerFactoryDefault
 from tianshou.env import ShmemVectorEnv, TruncatedAsTerminated
 from tianshou.exploration import GaussianNoise
-from Policy import CusDDPGPolicy
+from Policy import CusDDPGPolicy,CustomICMPolicy,IntrinsicCuriosityModule
 from tianshou.policy import DDPGPolicy
 from tianshou.policy.base import BasePolicy
-from tianshou.policy.modelbased.icm import ICMPolicy
-from tianshou.utils.net.discrete import IntrinsicCuriosityModule
+
 from tianshou.trainer import OffpolicyTrainer
 from tianshou.utils.net.common import Net, get_dict_state_decorator
 from tianshou.utils.net.continuous import Actor, Critic
 from tianshou.env.venvs import BaseVectorEnv
 from tianshou.utils.space_info import ActionSpaceInfo
 from training_functions import Reward_Estimator
+from atari_network import DQN
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -81,7 +81,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--is_L2",
         type=bool,
-        default=False,
+        default=True,
         help="weight for the forward model loss in ICM",
     )
     parser.add_argument(
@@ -99,7 +99,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--icm-lr-scale",
         type=float,
-        default=0.2,
+        default=0,
         help="use intrinsic curiosity module with this lr scale",
     )
     parser.add_argument(
@@ -237,30 +237,32 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
             action_space=env.action_space
         )
 
+
     # 如果启用ICM，创建ICM策略
     if args.icm_lr_scale > 0:
         print('use ICM')
-        # 创建特征网络
-        feature_net = dict_state_dec(Net)(
-            flat_state_shape,
-            hidden_sizes=args.hidden_sizes,
-            device=args.device,
-        )
-        action_dim = np.prod(args.action_shape)
-        feature_dim = args.hidden_sizes[-1]  # 使用最后一层隐藏层大小作为特征维度
-        
-        # 创建ICM网络
+        # 修改 ICM 模型的处理方式
+        observation_dim=31
+        feature_net = DQN(observation_dim, env.action_space.shape, args.device, features_only=True)
+        # feature_net = Net(
+        #     # 只使用 observation 部分作为特征
+        #     state_shape=env.observation_space["observation"].shape,
+        #     action_shape=env.action_space.shape,
+        #     hidden_sizes=args.hidden_sizes,
+        #     device=args.device,
+        # ).to(args.device)
+        action_dim = np.prod(env.action_space.shape)
+        feature_dim = feature_net.output_dim
         icm_net = IntrinsicCuriosityModule(
-            feature_net,
+            feature_net.net,
             feature_dim,
             action_dim,
-            hidden_sizes=[512],
+            hidden_sizes=args.hidden_sizes,
             device=args.device,
-        )
+            discrete_action=False
+        ).to(args.device)
         icm_optim = torch.optim.Adam(icm_net.parameters(), lr=args.icm_lr_scale)
-        
-        # 包装成ICM策略
-        policy = ICMPolicy(
+        policy = CustomICMPolicy(
             policy=base_policy,
             model=icm_net,
             optim=icm_optim,
@@ -283,7 +285,7 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
     def compute_reward_fn(achieved_goal: np.ndarray, goal: np.ndarray) -> np.ndarray:
     # 假设奖励基于欧几里得距离，距离阈值为0.05
         distance = np.linalg.norm(achieved_goal - goal, axis=-1)
-        reward = -(distance > 0.05).astype(np.float32)  # 如果距离大于阈值，奖励为-1，否则为0
+        reward = -(distance > 0.01).astype(np.float32)  # 如果距离大于阈值，奖励为-1，否则为0
         return reward
 
     buffer: VectorReplayBuffer | ReplayBuffer | HERReplayBuffer | HERVectorReplayBuffer
@@ -293,7 +295,7 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
         else:
             buffer = ReplayBuffer(args.buffer_size)
     elif args.replay_buffer== "per":
-            print('use per')
+            print('use PER')
             buffer = PrioritizedReplayBuffer(
             size=args.buffer_size,
             alpha=0.6, beta=0.4,
@@ -301,7 +303,7 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
             ignore_obs_next=True,
         )
     else:
-        print('use her')
+        print('use HER')
         if args.training_num > 1:
             buffer = HERVectorReplayBuffer(
                 args.buffer_size,
@@ -344,7 +346,7 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
         ).run()
         pprint.pprint(result)
 
-    policy.eval()
+    # policy.eval()
     # policy.set_eps(eps_test=0.9)
     test_envs.seed(args.seed)
     test_collector.reset()

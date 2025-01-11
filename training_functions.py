@@ -20,7 +20,7 @@ class Reward_Estimator:
             self.obs_dim=flat_state_shape
             self.type="Robotics"
         self.act_dim = act_dim
-        self.num_reward = 12
+        self.num_reward = 9
         if network_type == 'ResNet':
             self.Qnet = ResNet(self.obs_dim+self.act_dim, self.num_reward).to(args.device)
             self.Vnet = ResNet(self.obs_dim, self.num_reward ).to(args.device)
@@ -31,7 +31,7 @@ class Reward_Estimator:
         self.optim_V= torch.optim.Adam(self.Vnet.parameters(), lr=1e-3)
         self.reward_list = [0] * self.num_reward
         self.true_reward=[0]
-        self.threshold=0.9
+        self.threshold=0.6
         self.device=args.device
         self.data_augmentation=args.data_augmentation
         self.is_L2=args.is_L2
@@ -40,6 +40,7 @@ class Reward_Estimator:
         self.num_iter=args.epoch*args.step_per_epoch*args.update_per_step
         self.update_num=[]
         self.nonzero_num=[]
+        self.buffer_size=args.buffer_size
 
     def get_input_data(self, buffer, mask_nonzero):
         if mask_nonzero is None:
@@ -88,15 +89,22 @@ class Reward_Estimator:
         return torch.cat([obs, next_obs, action], dim=1).float()
     
     def calculate_mask(self, buffer):
-        reward_list=np.array(self.true_reward[self.true_reward != 0])
+        if self.type=="Atari":
+            reward_list = np.array(self.true_reward)  # 提取所有奖励值
+            reward_list = reward_list[reward_list != 0]
+        else:
+            reward_list=np.array(self.true_reward[self.true_reward != 0])
         return ~np.isin(buffer.rew, reward_list)
 
     def update_network(self, buffer, alpha):
         is_L2=self.is_L2
         # 分别计算非零奖励和零奖励的损失
-        mask_nonzero = buffer.rew != 0
-        mask_zero = buffer.rew == 0
-
+        if self.type=="Atari":
+            mask_nonzero = buffer.rew != 0
+            mask_zero = buffer.rew == 0
+        else:
+            mask_nonzero = buffer.rew != 0
+            mask_zero = buffer.rew == 0
         # # 计算真实奖励的损失
         input_data_nonzero = self.get_input_data(buffer, mask_nonzero)
         confidence_scores, loss2 = self.get_QVconfidence(input_data_nonzero, is_L2=is_L2)
@@ -138,25 +146,32 @@ class Reward_Estimator:
         self.optim_V.step()
 
     def update_true_reward(self, reward):
-        non_zero_rewards = reward[reward != 0]
-        if len(non_zero_rewards) == 0 or len(self.true_reward) >= self.num_reward:
-            return
-        update_flag=False
-        for r in non_zero_rewards:
-            if r.item() not in self.true_reward:
-                self.true_reward.append(r.item())
-                update_flag=True
-        
-        if update_flag:
-            if len(self.true_reward) > 0:
-                x = np.arange(len(self.true_reward))
-                y = np.array(self.true_reward)
-                f = np.interp(np.linspace(0, len(self.true_reward) - 1, self.num_reward), x, y)
-                self.true_reward = sorted(self.true_reward)
-                f = np.sort(f)
-                self.reward_list = f.tolist()
-            print('\nreward list:', self.reward_list)
-            print('\ntrue reward:', self.true_reward)
+        if self.type=="Atari":
+            non_zero_rewards = reward[reward != 0]
+            if len(non_zero_rewards) == 0 or len(self.true_reward) >= self.num_reward:
+                return
+            update_flag=False
+            for r in non_zero_rewards:
+                if r.item() not in self.true_reward:
+                    self.true_reward.append(r.item())
+                    update_flag=True
+            
+            if update_flag:
+                if len(self.true_reward) > 0:
+                    x = np.arange(len(self.true_reward))
+                    y = np.array(self.true_reward)
+                    f = np.interp(np.linspace(0, len(self.true_reward) - 1, self.num_reward), x, y)
+                    self.true_reward = sorted(self.true_reward)
+                    f = np.sort(f)
+                    self.reward_list = f.tolist()
+                print('\nreward list:', self.reward_list)
+                print('\ntrue reward:', self.true_reward)
+        else:
+            if len(self.true_reward)==1:
+                self.true_reward=[0,-1]
+                self.reward_list=list(np.linspace(-1,1,self.num_reward))
+                print('\nreward list:', self.reward_list)
+                print('\ntrue reward:', self.true_reward)
 
     def update_reward(self, buffer,iter,alpha):
         num_iter=self.num_iter 
@@ -167,12 +182,14 @@ class Reward_Estimator:
         # input_data = torch.cat([obs, obs_next, act], dim=-1).float().to(self.device)
         input_data=self.get_input_data(buffer,None)
         # 对于buffer中reward不等于true_reward里的值的项
+        
+        
         mask = self.calculate_mask(buffer)
+
 
         # if iter%100 == 0:
         #     print('真实reward的数量:', np.sum(~mask))
         num_real_reward=np.sum(~mask)
-        self.nonzero_num.append(num_real_reward)
         mask = torch.from_numpy(mask)
         # if num_real_reward<50:
         #     update_prob=0.01
@@ -195,10 +212,19 @@ class Reward_Estimator:
                 
             # 更新满足条件的奖励
             update_mask = max_confidence > self.threshold
-            self.update_num.append(int(sum(update_mask)))
-            if sum(update_mask)>1:
-                new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
-                buffer.rew[mask][update_mask] = new_rewards.numpy()
+            update_num = sum(update_mask)
+            
+            if update_num > 1:
+                if update_num > 0.9*self.buffer_size and iter>0.6*self.num_iter:
+                    # 选取confidence score前10000大的对应的reward来更新
+                    top_k_indices = torch.topk(max_confidence, int(0.6*self.buffer_size)).indices
+                    new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[top_k_indices]])
+                    self.update_num.append(int(0.6*self.buffer_size))
+                    buffer.rew[mask][top_k_indices] = new_rewards.numpy()
+                else:
+                    new_rewards = torch.tensor([self.reward_list[i] for i in max_indices[update_mask]])
+                    self.update_num.append(int(update_num))
+                    buffer.rew[mask][update_mask] = new_rewards.numpy()
 
                 # if iter%40000>30000 and self.is_store:
                 #     reward_log_path = os.path.join("log", "reward_distribution",self.task,str(self.is_L2))
@@ -238,13 +264,9 @@ class Reward_Estimator:
         
         if iter%1000==0:
             update_num_path = os.path.join("log", "monitor","update_num")
-            nonzero_num_path = os.path.join("log", "monitor","nonzero_num")
             os.makedirs(update_num_path, exist_ok=True)
             update_num_file = os.path.join(update_num_path, f"update_num.npy")
             np.save(update_num_file, self.update_num)
-            os.makedirs(nonzero_num_path, exist_ok=True)
-            nonzero_num_file = os.path.join(nonzero_num_path, f"nonzero_num.npy")
-            np.save(nonzero_num_file, self.nonzero_num)
 
             
 
@@ -322,6 +344,6 @@ class Reward_Estimator:
 
     def set_threshold(self,iter):
         # 随着iter增大,threshold从0.8逐渐增加到0.95
-        self.threshold = 0.8 + 0.19 * (1 - np.exp(-iter / self.num_iter))
+        self.threshold = 0.6 + 0.19999 * (1 - np.exp(-iter / self.num_iter))
         
 
