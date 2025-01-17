@@ -81,7 +81,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--is_L2",
         type=bool,
-        default=True,
+        default=False,
         help="weight for the forward model loss in ICM",
     )
     parser.add_argument(
@@ -242,7 +242,7 @@ def test_ddpg(args: argparse.Namespace = get_args()) -> None:
     if args.icm_lr_scale > 0:
         print('use ICM')
         # 修改 ICM 模型的处理方式
-        observation_dim=31
+        observation_dim=16
         feature_net = DQN(observation_dim, env.action_space.shape, args.device, features_only=True)
         # feature_net = Net(
         #     # 只使用 observation 部分作为特征
