@@ -24,7 +24,7 @@ from tianshou.data.types import (
     ObsBatchProtocol,
     RolloutBatchProtocol,
 )
-from tianshou.policy import BasePolicy,DQNPolicy,DDPGPolicy
+from tianshou.policy import BasePolicy,DQNPolicy,DDPGPolicy,DiscreteSACPolicy
 from tianshou.policy.base import TLearningRateScheduler, TrainingStats
 
 from training_functions import Reward_Estimator
@@ -142,9 +142,42 @@ class CusDQNPolicy(DQNPolicy):
             alpha = 0.5
             self.reward_estimator.update(batch, buffer, alpha, self._iter)
     
+class CusSACPolicy(DiscreteSACPolicy):
+
+    def __init__(self, reward_estimator: Reward_Estimator, args,  **kwargs: Any) -> None:
+        super().__init__( **kwargs)  # 调用父类的初始化方法
+        self.reward_estimator = reward_estimator
+        self.args = args
+        self.iter=0
+
+    def post_process_fn(
+        self,
+        batch: BatchProtocol,
+        buffer: ReplayBuffer,
+        indices: np.ndarray,
+    ) -> None:
+        """Post-process the data from the provided replay buffer.
+
+        Typical usage is to update the sampling weight in prioritized
+        experience replay. Used in :meth:`update`.
+        """
+        # 一共 epoch*step_per_epoch*update_per_step 次 iter, 200000
+        # alpha 从 0 到 0.5
+        num_iter = self.args.epoch * self.args.step_per_epoch * self.args.update_per_step
+        if self.iter < num_iter * 0.6:
+            alpha = 1 - np.exp(-self.iter / num_iter)  
+            self.reward_estimator.update(batch, buffer, alpha, self.iter)
+        else:
+            alpha = 0.5
+            self.reward_estimator.update(batch, buffer, alpha, self.iter)
+
+
+
+
 
 # 添加新的 CustomICMPolicy 类
 class CustomICMPolicy(ICMPolicy):
+    ''''修改便于在fetch环境中运行'''
     def process_fn(self, batch, buffer, indices):
             # 处理字典观察空间
         if not isinstance(batch.obs, np.ndarray):

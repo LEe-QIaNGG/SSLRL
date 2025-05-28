@@ -3,12 +3,17 @@ import datetime
 import os
 import pprint
 import sys
+from ale_py import ALEInterface
+ale = ALEInterface()
 import gymnasium as gym 
-import gymnasium_robotics
+from tianshou.utils.net.discrete import Actor, Critic
+from tianshou.exploration import GaussianNoise
+# import gymnasium_robotics
 
 import numpy as np
 import torch
 from tianshou.utils.net.common import Net
+from atari_network import DQN
 from gymnasium.spaces import Box, Discrete, MultiBinary, MultiDiscrete
 from robotics_test import make_fetch_env
 
@@ -17,7 +22,7 @@ from tianshou.data import Collector, CollectStats    , VectorReplayBuffer
 from tianshou.highlevel.logger import LoggerFactoryDefault
 from tianshou.utils.logger.tensorboard import TensorboardLogger
 from torch.utils.tensorboard import SummaryWriter
-from Policy import DQNPolicy
+from Policy import DQNPolicy,CusSACPolicy
 from tianshou.policy.base import BasePolicy
 from tianshou.trainer import OffpolicyTrainer
 from tianshou.utils.space_info import SpaceInfo
@@ -38,7 +43,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--n-step", type=int, default=3)
     parser.add_argument("--target-update-freq", type=int, default=400)
-    parser.add_argument("--epoch", type=int, default=2000)
+    parser.add_argument("--epoch", type=int, default=1000)
     parser.add_argument("--step-per-epoch", type=int, default=2000)
     parser.add_argument("--step-per-collect", type=int, default=10)
     parser.add_argument("--update-per-step", type=float, default=0.1)
@@ -108,9 +113,16 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--test_type",
         type=str,
-        default="DA_test",
+        default="framework_test",
         help="DA_test,framework_test",
     )
+    parser.add_argument("--actor-lr", type=float, default=1e-5)
+    parser.add_argument("--critic-lr", type=float, default=1e-5)
+    parser.add_argument("--tau", type=float, default=0.005)
+    parser.add_argument("--alpha", type=float, default=0.05)
+    parser.add_argument("--auto-alpha", action="store_true", default=True)
+    parser.add_argument("--alpha-lr", type=float, default=3e-4)
+    parser.add_argument("--hidden-size", type=int, default=512)
     return parser.parse_args()
 
 
@@ -143,19 +155,45 @@ def main(args: argparse.Namespace = get_args()) -> None:
     state_shape = space_info.observation_info.obs_shape
     action_shape = space_info.action_info.action_shape
     net = Net(state_shape=state_shape, action_shape=action_shape, hidden_sizes=[128, 128, 128],device=args.device)
-    optim = torch.optim.Adam(net.parameters(), lr=args.lr)
     reward_estimator=Reward_Estimator(args)
     # define policy
-    policy= DQNPolicy(
-        model=net,
-        optim=optim,
+    net = DQN(
+        *args.state_shape,
+        args.action_shape,
+        device=args.device,
+        features_only=True,
+        output_dim_added_layer=args.hidden_size,
+    )
+    actor = Actor(net, args.action_shape, device=args.device, softmax_output=False)
+    actor_optim = torch.optim.Adam(actor.parameters(), lr=args.actor_lr)
+    critic1 = Critic(net, last_size=args.action_shape, device=args.device)
+    critic1_optim = torch.optim.Adam(critic1.parameters(), lr=args.critic_lr)
+    critic2 = Critic(net, last_size=args.action_shape, device=args.device)
+    critic2_optim = torch.optim.Adam(critic2.parameters(), lr=args.critic_lr)
+
+    # define policy
+    if args.auto_alpha:
+        target_entropy = 0.98 * np.log(np.prod(args.action_shape))
+        log_alpha = torch.zeros(1, requires_grad=True, device=args.device)
+        alpha_optim = torch.optim.Adam([log_alpha], lr=args.alpha_lr)
+        args.alpha = (target_entropy, log_alpha, alpha_optim)
+
+    policy = CusSACPolicy(
+        actor=actor,
+        actor_optim=actor_optim,
+        critic=critic1,
+        critic_optim=critic1_optim,
+        critic2=critic2,
+        critic2_optim=critic2_optim,
         action_space=env.action_space,
-        discount_factor=args.gamma,
-        estimation_step=args.n_step,#  n step  DQN
-        target_update_freq=args.target_update_freq,
+        tau=args.tau,
+        gamma=args.gamma,
+        alpha=args.alpha,
+        estimation_step=args.n_step,
         reward_estimator=reward_estimator,
-        args=args
+        args=args,
     ).to(args.device)
+
 
     # load a previous policy
     if args.resume_path:
@@ -173,33 +211,31 @@ def main(args: argparse.Namespace = get_args()) -> None:
     # log
     now = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
     args.algo_name = "dqn_icm" if args.icm_lr_scale > 0 else "dqn"
-    log_name = os.path.join(args.task, args.test_type,args.data_augmentation+' L2 '+str(args.is_L2)+now)
+    log_name = os.path.join(args.task, args.test_type,str(args.seed),args.data_augmentation+' L2 '+str(args.is_L2)+now)
     log_path = os.path.join(args.logdir, log_name)
 
 
-    logger = TensorboardLogger(SummaryWriter(log_path),train_interval=200000,test_interval=200000,update_interval=200000,save_interval=200000)
+    logger = TensorboardLogger(SummaryWriter(log_path),train_interval=10000,test_interval=10000,update_interval=10000,save_interval=10000)
 
     def save_best_fn(policy: BasePolicy) -> None:
-        pass
+        torch.save(policy.state_dict(), os.path.join(log_path, "policy.pth"))
 
-    def stop_fn(mean_rewards: float) -> bool:
-        pass
+    # def stop_fn(mean_rewards: float) -> bool:
+    #     pass
 
-    def train_fn(epoch: int, env_step: int) -> None:
-        # nature DQN setting, linear decay in the first 1M steps
-        num_steps = args.step_per_epoch*args.epoch
-        if env_step <= num_steps:
-            eps = args.eps_train - env_step / num_steps * (args.eps_train - args.eps_train_final)
-        else:
-            eps = args.eps_train_final
-        policy.set_eps(eps)
+    # def train_fn(epoch: int, env_step: int) -> None:
+    #     # nature DQN setting, linear decay in the first 1M steps
+    #     num_steps = args.step_per_epoch*args.epoch
+    #     if env_step <= num_steps:
+    #         eps = args.eps_train - env_step / num_steps * (args.eps_train - args.eps_train_final)
+    #     else:
+    #         eps = args.eps_train_final
+    #     policy.set_eps(eps)
 
         
-    def test_fn(epoch: int, env_step: int | None) -> None:
-        policy.set_eps(args.eps_test)
+    # def test_fn(epoch: int, env_step: int | None) -> None:
+    #     policy.set_eps(args.eps_test)
 
-    def save_checkpoint_fn(epoch: int, env_step: int, gradient_step: int) -> str:
-        pass
 
     # watch agent's performance
     def watch() -> None:
@@ -241,16 +277,16 @@ def main(args: argparse.Namespace = get_args()) -> None:
         step_per_collect=args.step_per_collect,
         episode_per_test=args.test_num,
         batch_size=args.batch_size,
-        train_fn=train_fn,
-        test_fn=test_fn,
-        stop_fn=stop_fn,
+        # train_fn=train_fn,
+        # test_fn=test_fn,
+        # stop_fn=stop_fn,
         save_best_fn=save_best_fn,
         logger=logger,
         verbose=False,
         update_per_step=args.update_per_step,
         test_in_train=False,
         resume_from_log=args.resume_id is not None,
-        save_checkpoint_fn=save_checkpoint_fn,
+        # save_checkpoint_fn=save_checkpoint_fn,
     ).run()
 
     pprint.pprint(result)

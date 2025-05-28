@@ -10,7 +10,7 @@ from data_augmentation import (
 )
     
 class Reward_Estimator:
-    def __init__(self,args,flat_state_shape, act_dim=1,network_type='FCNet'):
+    def __init__(self,args,flat_state_shape=None, act_dim=1,network_type='FCNet'):
         '''要求环境的action是discrete,reward是discrete
         '''
         if flat_state_shape is None:
@@ -86,7 +86,7 @@ class Reward_Estimator:
                 
             action = torch.tensor(buffer.act[mask_nonzero], device=self.device)
         
-        return torch.cat([obs, next_obs, action], dim=1).float()
+        return torch.cat([obs, next_obs, action.unsqueeze(-1)], dim=1).float()
     
     def calculate_mask(self, buffer):
         if self.type=="Atari":
@@ -262,11 +262,11 @@ class Reward_Estimator:
 
         self.set_threshold(iter)
         
-        if iter%1000==0:
-            update_num_path = os.path.join("log", "monitor","update_num")
-            os.makedirs(update_num_path, exist_ok=True)
-            update_num_file = os.path.join(update_num_path, f"update_num.npy")
-            np.save(update_num_file, self.update_num)
+        # if iter%1000==0:
+        #     update_num_path = os.path.join("log", "monitor","update_num")
+        #     os.makedirs(update_num_path, exist_ok=True)
+        #     update_num_file = os.path.join(update_num_path, f"update_num.npy")
+        #     np.save(update_num_file, self.update_num)
 
             
 
