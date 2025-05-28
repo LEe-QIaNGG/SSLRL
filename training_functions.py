@@ -292,6 +292,9 @@ class Reward_Estimator:
             self.update_reward(buffer,iter,alpha)
             # print("reward updated")
 
+        if iter>0.6*self.num_iter and self.is_L2==False:
+            self.is_L2=True
+
 
         
         
